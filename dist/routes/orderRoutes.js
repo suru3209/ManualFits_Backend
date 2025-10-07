@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const orderController_1 = require("../controllers/orderController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const router = (0, express_1.Router)();
+router.use(authMiddleware_1.authMiddleware);
+router.get("/", orderController_1.getOrders);
+router.get("/:orderId", orderController_1.getOrder);
+router.post("/", orderController_1.createOrder);
+router.put("/:orderId/status", orderController_1.updateOrderStatus);
+router.patch("/:orderId/cancel", orderController_1.cancelOrder);
+router.patch("/:orderId/return-replace", orderController_1.returnReplaceOrder);
+exports.default = router;

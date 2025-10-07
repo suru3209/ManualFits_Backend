@@ -1,0 +1,22 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const chatController_1 = require("../controllers/chatController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const adminAuthMiddleware_1 = require("../middleware/adminAuthMiddleware");
+const router = express_1.default.Router();
+router.get("/user/chats", authMiddleware_1.authenticateToken, chatController_1.getUserChats);
+router.post("/user/chats", authMiddleware_1.authenticateToken, chatController_1.createChat);
+router.get("/user/chats/:chatId/messages", authMiddleware_1.authenticateToken, chatController_1.getChatMessages);
+router.post("/user/chats/:chatId/messages", authMiddleware_1.authenticateToken, chatController_1.sendMessage);
+router.patch("/user/chats/:chatId/close", authMiddleware_1.authenticateToken, chatController_1.closeChat);
+router.get("/admin/chats", adminAuthMiddleware_1.adminAuth, chatController_1.getAdminChats);
+router.get("/admin/chats/:chatId/messages", adminAuthMiddleware_1.adminAuth, chatController_1.getChatMessages);
+router.post("/admin/chats/:chatId/messages", adminAuthMiddleware_1.adminAuth, chatController_1.sendMessage);
+router.patch("/admin/chats/:chatId/status", adminAuthMiddleware_1.adminAuth, chatController_1.updateChatStatus);
+router.patch("/admin/chats/:chatId/close", adminAuthMiddleware_1.adminAuth, chatController_1.closeChat);
+router.get("/admin/chats/stats", adminAuthMiddleware_1.adminAuth, chatController_1.getChatStats);
+exports.default = router;
