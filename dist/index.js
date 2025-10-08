@@ -32,15 +32,15 @@ const app = (0, express_1.default)();
 const server = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:3000",
+        origin: process.env.FRONTEND_URL || "https://manual-fits-frontend-x94h.vercel.app",
         methods: ["GET", "POST"],
         credentials: true,
     },
 });
 const socketHandler = new socketHandler_1.SocketHandler(io);
 app.use(corsMiddleware_1.requestLogger);
-app.use(corsMiddleware_1.securityHeaders);
 app.use(corsMiddleware_1.corsMiddleware);
+app.use(corsMiddleware_1.securityHeaders);
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 app.use("/api/auth", authRoutes_1.default);

@@ -39,7 +39,9 @@ const server = createServer(app);
 // Socket.io setup
 const io = new SocketIOServer(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "manual-fits-frontend-x94h.vercel.app",
+    origin:
+      process.env.FRONTEND_URL ||
+      "https://manual-fits-frontend-x94h.vercel.app",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -48,10 +50,10 @@ const io = new SocketIOServer(server, {
 // Initialize socket handler
 const socketHandler = new SocketHandler(io);
 // Middleware setup
-app.use(express.json());
 app.use(requestLogger);
 app.use(corsMiddleware);
 app.use(securityHeaders);
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
