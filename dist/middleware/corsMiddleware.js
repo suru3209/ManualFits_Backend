@@ -10,7 +10,7 @@ const corsOptions = {
         if (!origin)
             return callback(null, true);
         const allowedOrigins = [
-            process.env.FRONTEND_URL || "http://localhost:3000",
+            process.env.FRONTEND_URL || "https://main.d1u1nl9px7pz6j.amplifyapp.com/",
             "http://localhost:3000",
             "http://localhost:3001",
             "https://manualfits.com",
