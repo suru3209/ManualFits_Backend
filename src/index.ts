@@ -47,7 +47,6 @@ const io = new SocketIOServer(server, {
 
 // Initialize socket handler
 const socketHandler = new SocketHandler(io);
-
 // Middleware setup
 app.use(requestLogger);
 app.use(securityHeaders);

@@ -17,7 +17,7 @@ const corsOptions = {
             "https://www.manualfits.com",
             "https://manualfits.vercel.app",
             "https://manualfits-git-main-surya3209.vercel.app",
-            "https://manualfits-git-develop-surya3209.vercel.app"
+            "https://manualfits-git-develop-surya3209.vercel.app",
         ];
         if (allowedOrigins.includes(origin)) {
             callback(null, true);
@@ -36,7 +36,7 @@ const corsOptions = {
         "Authorization",
         "Cache-Control",
         "Pragma",
-        "X-API-Key"
+        "X-API-Key",
     ],
     exposedHeaders: ["X-Total-Count", "X-Page-Count"],
     credentials: true,

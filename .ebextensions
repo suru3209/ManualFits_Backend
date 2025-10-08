@@ -1,0 +1,3 @@
+commands:
+  01_rebuild_bcrypt:
+    command: "npm rebuild bcrypt --build-from-source"
