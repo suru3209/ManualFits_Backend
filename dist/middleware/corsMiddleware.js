@@ -3,12 +3,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.requestLogger = exports.securityHeaders = exports.corsMiddleware = void 0;
+exports.requestLogger = exports.securityHeaders = exports.corsPreflightHandler = exports.corsMiddleware = void 0;
 const cors_1 = __importDefault(require("cors"));
 const corsOptions = {
     origin: function (origin, callback) {
-        if (!origin)
+        if (!origin) {
+            console.log("CORS: Allowing request with no origin");
             return callback(null, true);
+        }
         const allowedOrigins = [
             process.env.FRONTEND_URL ||
                 "https://manual-fits-frontend-x94h.vercel.app",
@@ -20,11 +22,15 @@ const corsOptions = {
             "https://manualfits-git-main-surya3209.vercel.app",
             "https://manualfits-git-develop-surya3209.vercel.app",
         ];
+        console.log(`CORS: Checking origin: ${origin}`);
+        console.log(`CORS: Allowed origins:`, allowedOrigins);
+        console.log(`CORS: FRONTEND_URL env var:`, process.env.FRONTEND_URL);
         if (allowedOrigins.includes(origin)) {
+            console.log(`CORS: ✅ Allowing request from origin: ${origin}`);
             callback(null, true);
         }
         else {
-            console.warn(`CORS: Blocked request from origin: ${origin}`);
+            console.warn(`CORS: ❌ Blocked request from origin: ${origin}`);
             callback(new Error("Not allowed by CORS"));
         }
     },
@@ -46,6 +52,40 @@ const corsOptions = {
     maxAge: 86400,
 };
 exports.corsMiddleware = (0, cors_1.default)(corsOptions);
+const corsPreflightHandler = (req, res, next) => {
+    if (req.method === "OPTIONS") {
+        console.log("CORS: Handling preflight request for:", req.path);
+        console.log("CORS: Origin:", req.headers.origin);
+        console.log("CORS: Request method:", req.headers["access-control-request-method"]);
+        console.log("CORS: Request headers:", req.headers["access-control-request-headers"]);
+        const origin = req.headers.origin;
+        const allowedOrigins = [
+            process.env.FRONTEND_URL || "https://manual-fits-frontend-x94h.vercel.app",
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "https://manualfits.com",
+            "https://www.manualfits.com",
+            "https://manualfits.vercel.app",
+            "https://manualfits-git-main-surya3209.vercel.app",
+            "https://manualfits-git-develop-surya3209.vercel.app",
+        ];
+        if (origin && allowedOrigins.includes(origin)) {
+            res.setHeader("Access-Control-Allow-Origin", origin);
+            res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
+            res.setHeader("Access-Control-Allow-Headers", "Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control,Pragma,X-API-Key");
+            res.setHeader("Access-Control-Allow-Credentials", "true");
+            res.setHeader("Access-Control-Max-Age", "86400");
+            console.log("CORS: ✅ Preflight headers set for origin:", origin);
+        }
+        else {
+            console.log("CORS: ❌ Preflight blocked for origin:", origin);
+        }
+        res.status(200).end();
+        return;
+    }
+    next();
+};
+exports.corsPreflightHandler = corsPreflightHandler;
 const securityHeaders = (req, res, next) => {
     res.removeHeader("X-Powered-By");
     res.setHeader("X-Content-Type-Options", "nosniff");
