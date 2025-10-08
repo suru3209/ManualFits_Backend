@@ -11,7 +11,8 @@ const corsOptions = {
     if (!origin) return callback(null, true);
 
     const allowedOrigins = [
-      process.env.FRONTEND_URL || "https://main.d1u1nl9px7pz6j.amplifyapp.com/",
+      process.env.FRONTEND_URL ||
+        "https://manual-fits-frontend-x94h.vercel.app",
       "http://localhost:3000",
       "http://localhost:3001",
       "https://manualfits.com",
