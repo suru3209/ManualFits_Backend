@@ -48,9 +48,9 @@ const io = new SocketIOServer(server, {
 // Initialize socket handler
 const socketHandler = new SocketHandler(io);
 // Middleware setup
+app.use(corsMiddleware);
 app.use(requestLogger);
 app.use(securityHeaders);
-app.use(corsMiddleware);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
