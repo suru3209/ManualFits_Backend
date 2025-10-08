@@ -33,45 +33,6 @@ const corsOptions = {
 
 export const corsMiddleware = cors(corsOptions);
 
-// Additional CORS handling for preflight requests
-export const corsPreflightHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  // Handle preflight requests
-  if (req.method === "OPTIONS") {
-    console.log("CORS: Handling preflight request for:", req.path);
-    console.log("CORS: Origin:", req.headers.origin);
-    
-    // Set CORS headers manually for preflight
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-      process.env.FRONTEND_URL || "https://manual-fits-frontend-x94h.vercel.app",
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "https://manualfits.com",
-      "https://www.manualfits.com",
-      "https://manualfits.vercel.app",
-      "https://manualfits-git-main-surya3209.vercel.app",
-      "https://manualfits-git-develop-surya3209.vercel.app",
-    ];
-    
-    if (origin && allowedOrigins.includes(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control,Pragma,X-API-Key");
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-      res.setHeader("Access-Control-Max-Age", "86400");
-      console.log("CORS: ✅ Preflight headers set for origin:", origin);
-      res.status(200).end();
-      return;
-    } else {
-      console.log("CORS: ❌ Preflight blocked for origin:", origin);
-    }
-  }
-  next();
-};
 
 // Security headers middleware
 export const securityHeaders = (
