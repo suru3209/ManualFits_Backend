@@ -3,40 +3,16 @@ import { Request, Response, NextFunction } from "express";
 
 // CORS configuration
 const corsOptions = {
-  origin: function (
-    origin: string | undefined,
-    callback: (err: Error | null, allow?: boolean) => void
-  ) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      console.log("CORS: Allowing request with no origin");
-      return callback(null, true);
-    }
-
-    const allowedOrigins = [
-      process.env.FRONTEND_URL ||
-        "https://manual-fits-frontend-x94h.vercel.app",
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "https://manualfits.com",
-      "https://www.manualfits.com",
-      "https://manualfits.vercel.app",
-      "https://manualfits-git-main-surya3209.vercel.app",
-      "https://manualfits-git-develop-surya3209.vercel.app",
-    ];
-
-    console.log(`CORS: Checking origin: ${origin}`);
-    console.log(`CORS: Allowed origins:`, allowedOrigins);
-    console.log(`CORS: FRONTEND_URL env var:`, process.env.FRONTEND_URL);
-
-    if (allowedOrigins.includes(origin)) {
-      console.log(`CORS: ✅ Allowing request from origin: ${origin}`);
-      callback(null, true);
-    } else {
-      console.warn(`CORS: ❌ Blocked request from origin: ${origin}`);
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
+  origin: [
+    process.env.FRONTEND_URL || "https://manual-fits-frontend-x94h.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://manualfits.com",
+    "https://www.manualfits.com",
+    "https://manualfits.vercel.app",
+    "https://manualfits-git-main-surya3209.vercel.app",
+    "https://manualfits-git-develop-surya3209.vercel.app",
+  ],
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: [
     "Origin",
@@ -67,8 +43,6 @@ export const corsPreflightHandler = (
   if (req.method === "OPTIONS") {
     console.log("CORS: Handling preflight request for:", req.path);
     console.log("CORS: Origin:", req.headers.origin);
-    console.log("CORS: Request method:", req.headers["access-control-request-method"]);
-    console.log("CORS: Request headers:", req.headers["access-control-request-headers"]);
     
     // Set CORS headers manually for preflight
     const origin = req.headers.origin;
@@ -90,12 +64,11 @@ export const corsPreflightHandler = (
       res.setHeader("Access-Control-Allow-Credentials", "true");
       res.setHeader("Access-Control-Max-Age", "86400");
       console.log("CORS: ✅ Preflight headers set for origin:", origin);
+      res.status(200).end();
+      return;
     } else {
       console.log("CORS: ❌ Preflight blocked for origin:", origin);
     }
-    
-    res.status(200).end();
-    return;
   }
   next();
 };
