@@ -40,8 +40,7 @@ const io = new socket_io_1.Server(server, {
 });
 const socketHandler = new socketHandler_1.SocketHandler(io);
 app.use(corsMiddleware_1.requestLogger);
-app.use(corsMiddleware_1.explicitCorsHeaders);
-app.use(corsMiddleware_1.corsMiddleware);
+app.use(corsMiddleware_1.simpleCors);
 app.use(corsMiddleware_1.securityHeaders);
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
