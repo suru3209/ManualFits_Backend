@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import jwt = require("jsonwebtoken");
 import User from "../models/User";
 export const signup = async (req: Request, res: Response) => {
