@@ -40,9 +40,16 @@ const server = createServer(app);
 // Socket.io setup
 const io = new SocketIOServer(server, {
   cors: {
-    origin:
-      process.env.FRONTEND_URL ||
+    origin: [
+      process.env.FRONTEND_URL || "https://manualfits.com",
+      "https://www.manualfits.com",
       "https://manual-fits-frontend-x94h.vercel.app",
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "https://manualfits.vercel.app",
+      "https://manualfits-git-main-surya3209.vercel.app",
+      "https://manualfits-git-develop-surya3209.vercel.app",
+    ],
     methods: ["GET", "POST"],
     credentials: true,
   },

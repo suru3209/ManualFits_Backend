@@ -32,8 +32,16 @@ const app = (0, express_1.default)();
 const server = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL ||
+        origin: [
+            process.env.FRONTEND_URL || "https://manualfits.com",
+            "https://www.manualfits.com",
             "https://manual-fits-frontend-x94h.vercel.app",
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "https://manualfits.vercel.app",
+            "https://manualfits-git-main-surya3209.vercel.app",
+            "https://manualfits-git-develop-surya3209.vercel.app",
+        ],
         methods: ["GET", "POST"],
         credentials: true,
     },
