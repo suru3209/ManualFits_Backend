@@ -33,6 +33,39 @@ const corsOptions = {
 
 export const corsMiddleware = cors(corsOptions);
 
+// Explicit CORS headers middleware
+export const explicitCorsHeaders = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    process.env.FRONTEND_URL || "https://manual-fits-frontend-x94h.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://manualfits.com",
+    "https://www.manualfits.com",
+    "https://manualfits.vercel.app",
+    "https://manualfits-git-main-surya3209.vercel.app",
+    "https://manualfits-git-develop-surya3209.vercel.app",
+  ];
+
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    console.log("CORS: ✅ Set explicit headers for origin:", origin);
+  } else if (!origin) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    console.log("CORS: ✅ Set wildcard origin for no-origin request");
+  } else {
+    console.log("CORS: ❌ Origin not allowed:", origin);
+  }
+  
+  next();
+};
+
 
 // Security headers middleware
 export const securityHeaders = (

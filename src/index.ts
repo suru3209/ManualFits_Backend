@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import {
   corsMiddleware,
+  explicitCorsHeaders,
   securityHeaders,
   requestLogger,
 } from "./middleware/corsMiddleware";
@@ -51,6 +52,7 @@ const io = new SocketIOServer(server, {
 const socketHandler = new SocketHandler(io);
 // Middleware setup
 app.use(requestLogger);
+app.use(explicitCorsHeaders); // Set explicit CORS headers first
 app.use(corsMiddleware);
 app.use(securityHeaders);
 app.use(express.json());
