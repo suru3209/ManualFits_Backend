@@ -34,13 +34,35 @@ export const corsMiddleware = cors(corsOptions);
 
 // Simple CORS middleware that definitely works
 export const simpleCors = (req: Request, res: Response, next: NextFunction) => {
-  console.log("CORS: Processing request from origin:", req.headers.origin);
+  const origin = req.headers.origin;
+  console.log("CORS: Processing request from origin:", origin);
 
-  // Set CORS headers for all requests
-  res.setHeader(
-    "Access-Control-Allow-Origin",
-    "https://manual-fits-frontend-x94h.vercel.app"
-  );
+  // Define allowed origins
+  const allowedOrigins = [
+    process.env.FRONTEND_URL || "https://manualfits.com",
+    "https://www.manualfits.com",
+    "https://manual-fits-frontend-x94h.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://manualfits.vercel.app",
+    "https://manualfits-git-main-surya3209.vercel.app",
+    "https://manualfits-git-develop-surya3209.vercel.app",
+  ];
+
+  // Check if origin is allowed
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    console.log("CORS: ✅ Allowed origin:", origin);
+  } else if (!origin) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    console.log("CORS: ✅ No origin, using wildcard");
+  } else {
+    console.log("CORS: ❌ Origin not allowed:", origin);
+    // Still set headers but with a default origin
+    res.setHeader("Access-Control-Allow-Origin", "https://manualfits.com");
+  }
+
   res.setHeader(
     "Access-Control-Allow-Methods",
     "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS"
@@ -51,8 +73,6 @@ export const simpleCors = (req: Request, res: Response, next: NextFunction) => {
   );
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Max-Age", "86400");
-
-  console.log("CORS: ✅ Set CORS headers for all requests");
 
   // Handle preflight requests
   if (req.method === "OPTIONS") {

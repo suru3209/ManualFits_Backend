@@ -7,11 +7,10 @@ exports.requestLogger = exports.securityHeaders = exports.simpleCors = exports.c
 const cors_1 = __importDefault(require("cors"));
 const corsOptions = {
     origin: [
-        process.env.FRONTEND_URL || "https://manual-fits-frontend-x94h.vercel.app",
+        process.env.FRONTEND_URL || "https://manualfits.com",
+        "https://www.manualfits.com",
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://manualfits.com",
-        "https://www.manualfits.com",
         "https://manualfits.vercel.app",
         "https://manualfits-git-main-surya3209.vercel.app",
         "https://manualfits-git-develop-surya3209.vercel.app",
@@ -35,13 +34,34 @@ const corsOptions = {
 };
 exports.corsMiddleware = (0, cors_1.default)(corsOptions);
 const simpleCors = (req, res, next) => {
-    console.log("CORS: Processing request from origin:", req.headers.origin);
-    res.setHeader("Access-Control-Allow-Origin", "https://manual-fits-frontend-x94h.vercel.app");
+    const origin = req.headers.origin;
+    console.log("CORS: Processing request from origin:", origin);
+    const allowedOrigins = [
+        process.env.FRONTEND_URL || "https://manualfits.com",
+        "https://www.manualfits.com",
+        "https://manual-fits-frontend-x94h.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://manualfits.vercel.app",
+        "https://manualfits-git-main-surya3209.vercel.app",
+        "https://manualfits-git-develop-surya3209.vercel.app",
+    ];
+    if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        console.log("CORS: ✅ Allowed origin:", origin);
+    }
+    else if (!origin) {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        console.log("CORS: ✅ No origin, using wildcard");
+    }
+    else {
+        console.log("CORS: ❌ Origin not allowed:", origin);
+        res.setHeader("Access-Control-Allow-Origin", "https://manualfits.com");
+    }
     res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control,Pragma,X-API-Key");
     res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Access-Control-Max-Age", "86400");
-    console.log("CORS: ✅ Set CORS headers for all requests");
     if (req.method === "OPTIONS") {
         console.log("CORS: Handling preflight request");
         res.status(200).end();
