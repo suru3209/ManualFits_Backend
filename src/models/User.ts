@@ -48,6 +48,9 @@ export interface IUser extends Document {
   password: string;
   dob?: Date; // ✅ Date of Birth
   gender?: "Male" | "Female" | "Other"; // ✅ Gender
+  isEmailVerified: boolean; // Email verification status
+  otp?: string; // OTP for email verification
+  otpExpiresAt?: Date; // OTP expiry time
 
   addresses: IAddress[];
   saved_payments: {
@@ -120,6 +123,9 @@ const UserSchema = new Schema<IUser>(
     phone: { type: String }, // ✅ Added phone (non-unique for now)
     dob: { type: Date },
     gender: { type: String, enum: ["Male", "Female", "Other"] },
+    isEmailVerified: { type: Boolean, default: false },
+    otp: { type: String },
+    otpExpiresAt: { type: Date },
 
     addresses: [AddressSchema],
     saved_payments: {

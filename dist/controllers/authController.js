@@ -22,10 +22,8 @@ const signup = async (req, res) => {
             phone: undefined,
         });
         await newUser.save();
-        const token = jwt.sign({ id: newUser._id, email: newUser.email }, process.env.JWT_SECRET, { expiresIn: "7d" });
         res.status(201).json({
-            message: "User registered successfully",
-            token,
+            message: "User registered successfully.",
             user: {
                 id: newUser._id,
                 username: newUser.username,
@@ -53,7 +51,11 @@ const login = async (req, res) => {
         res.json({
             message: "Login successful",
             token,
-            user: { id: user._id, username: user.username, email: user.email },
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+            },
         });
     }
     catch (error) {

@@ -10,6 +10,8 @@
     "init-admin": "ts-node src/scripts/initAdmin.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.907.0",
+    "@types/nodemailer": "^7.0.2",
     "@types/socket.io": "^3.0.1",
     "bcrypt": "^6.0.0",
     "cloudinary": "^1.41.0",
@@ -20,6 +22,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.0.3",
     "multer": "^1.4.5-lts.1",
+    "nodemailer": "^7.0.9",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
