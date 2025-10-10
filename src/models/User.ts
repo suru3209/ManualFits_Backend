@@ -51,6 +51,7 @@ export interface IUser extends Document {
   isEmailVerified: boolean; // Email verification status
   otp?: string; // OTP for email verification
   otpExpiresAt?: Date; // OTP expiry time
+  otpVerified?: boolean; // OTP verification status
 
   addresses: IAddress[];
   saved_payments: {
@@ -126,6 +127,7 @@ const UserSchema = new Schema<IUser>(
     isEmailVerified: { type: Boolean, default: false },
     otp: { type: String },
     otpExpiresAt: { type: Date },
+    otpVerified: { type: Boolean },
 
     addresses: [AddressSchema],
     saved_payments: {

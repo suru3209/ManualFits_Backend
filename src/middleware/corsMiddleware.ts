@@ -4,8 +4,8 @@ import { Request, Response, NextFunction } from "express";
 // CORS configuration
 const corsOptions = {
   origin: [
-    process.env.FRONTEND_URL || "https://manualfits.com",
-    "https://www.manualfits.com",
+    process.env.FRONTEND_URL || "https://www.manualfits.com",
+    "https://manualfits.com",
     "http://localhost:3000",
     "http://localhost:3001",
     "https://manualfits.vercel.app",
@@ -41,6 +41,7 @@ export const simpleCors = (req: Request, res: Response, next: NextFunction) => {
   const allowedOrigins = [
     process.env.FRONTEND_URL || "https://manualfits.com",
     "https://www.manualfits.com",
+    "https://manualfits.com",
     "https://manual-fits-frontend-x94h.vercel.app",
     "http://localhost:3000",
     "http://localhost:3001",
@@ -59,8 +60,14 @@ export const simpleCors = (req: Request, res: Response, next: NextFunction) => {
     console.log("CORS: ✅ No origin, using wildcard");
   } else {
     console.log("CORS: ❌ Origin not allowed:", origin);
-    // Still set headers but with a default origin
-    res.setHeader("Access-Control-Allow-Origin", "https://manualfits.com");
+    // For production, allow the main domain even if not in list
+    if (origin && origin.includes("manualfits.com")) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      console.log("CORS: ✅ Allowing manualfits.com domain:", origin);
+    } else {
+      // Still set headers but with a default origin
+      res.setHeader("Access-Control-Allow-Origin", "https://manualfits.com");
+    }
   }
 
   res.setHeader(

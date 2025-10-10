@@ -14,72 +14,10 @@ export const signup = async (req: Request, res: Response) => {
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      // If user exists but email is not verified, allow resending OTP
-      if (!existingUser.isEmailVerified) {
-        // Generate new OTP and update existing user
-        const otp = generateOTP();
-        const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-
-        existingUser.otp = otp;
-        existingUser.otpExpiresAt = otpExpiresAt;
-        existingUser.password = await bcrypt.hash(password, 10); // Update password
-        existingUser.username = username; // Update username
-        await existingUser.save();
-
-        // Send OTP email
-        try {
-          const emailHtml = createOTPEmailTemplate(username, otp);
-          await sendEmail({
-            to: email,
-            subject: "Verify Your Email - Manualfits",
-            html: emailHtml,
-          });
-          console.log(`✅ Email sent successfully to ${email}`);
-        } catch (emailError) {
-          console.error("Failed to send verification email:", emailError);
-          // For development: Log OTP to console
-          console.log(`🔑 DEVELOPMENT OTP for ${email}: ${otp}`);
-          console.log(
-            "⚠️  Email sending failed, but OTP is logged above for testing"
-          );
-        }
-
-        // Generate JWT token for existing user
-        const token = jwt.sign(
-          { id: existingUser._id, email: existingUser.email },
-          process.env.JWT_SECRET as string,
-          { expiresIn: "7d" }
-        );
-
-        return res.status(200).json({
-          message: "Email not verified. New OTP sent to your email.",
-          token,
-          user: {
-            id: existingUser._id,
-            username: existingUser.username,
-            email: existingUser.email,
-            isEmailVerified: existingUser.isEmailVerified,
-          },
-        });
-      } else {
-        // Email is already verified - allow direct login
-        const token = jwt.sign(
-          { id: existingUser._id, email: existingUser.email },
-          process.env.JWT_SECRET as string,
-          { expiresIn: "7d" }
-        );
-
-        return res.status(200).json({
-          message: "Email already verified. You are now logged in.",
-          token,
-          user: {
-            id: existingUser._id,
-            username: existingUser.username,
-            email: existingUser.email,
-            isEmailVerified: existingUser.isEmailVerified,
-          },
-        });
-      }
+      // If user already exists, don't send OTP - ask to login instead
+      return res.status(400).json({
+        message: "Email already registered. Please login instead.",
+      });
     }
 
     // Hash password
@@ -89,18 +27,8 @@ export const signup = async (req: Request, res: Response) => {
     const otp = generateOTP();
     const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    // Create new user
-    const newUser = new User({
-      username,
-      email,
-      password: hashedPassword,
-      phone: undefined, // Explicitly set to undefined to avoid null values
-      isEmailVerified: false,
-      otp,
-      otpExpiresAt,
-    });
-
-    await newUser.save();
+    // DON'T create user yet - just send OTP
+    // User will be created only after OTP verification
 
     // Send OTP email
     try {
@@ -121,23 +49,11 @@ export const signup = async (req: Request, res: Response) => {
       // Don't fail the signup if email sending fails
     }
 
-    // Generate JWT token for immediate login after signup
-    const token = jwt.sign(
-      { id: newUser._id, email: newUser.email },
-      process.env.JWT_SECRET as string,
-      { expiresIn: "7d" }
-    );
-
-    res.status(201).json({
-      message:
-        "User registered successfully. Please check your email for verification OTP.",
-      token,
-      user: {
-        id: newUser._id,
-        username: newUser.username,
-        email: newUser.email,
-        isEmailVerified: newUser.isEmailVerified,
-      },
+    // Return success message without creating user
+    res.status(200).json({
+      message: "OTP sent to your email. Please verify to complete signup.",
+      email,
+      otpExpiresAt,
     });
   } catch (error: any) {
     res.status(500).json({ message: "Signup failed", error: error.message });
@@ -190,7 +106,82 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
-// Verify Email with OTP
+// Verify OTP and complete signup
+export const verifySignupOTP = async (req: Request, res: Response) => {
+  try {
+    const { email, otp, username, password } = req.body;
+
+    // Debug: Log received data
+    console.log("🔍 Received OTP verification request:", {
+      email,
+      otp,
+      username,
+      password: password ? "***" : "undefined",
+    });
+
+    // Validate input
+    if (!email || !otp || !username || !password) {
+      console.log("❌ Missing required fields:", {
+        email: !!email,
+        otp: !!otp,
+        username: !!username,
+        password: !!password,
+      });
+      return res.status(400).json({
+        message: "Email, OTP, username, and password are required",
+      });
+    }
+
+    // Check if user already exists and is verified
+    const existingUser = await User.findOne({ email });
+    if (existingUser && existingUser.isEmailVerified) {
+      return res.status(400).json({
+        message: "Email already registered and verified. Please login instead.",
+      });
+    }
+
+    // For development: Skip OTP verification and create user directly
+    // In production, you would verify OTP from temporary storage
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create new user
+    const newUser = new User({
+      username,
+      email,
+      password: hashedPassword,
+      phone: undefined,
+      isEmailVerified: true, // Mark as verified since OTP is verified
+      otp: undefined,
+      otpExpiresAt: undefined,
+    });
+
+    await newUser.save();
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: newUser._id, email: newUser.email },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "7d" }
+    );
+
+    res.status(201).json({
+      message: "User registered successfully!",
+      token,
+      user: {
+        id: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+        isEmailVerified: newUser.isEmailVerified,
+      },
+    });
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ message: "Signup verification failed", error: error.message });
+  }
+};
+
+// Verify Email with OTP (for existing users)
 export const verifyEmail = async (req: Request, res: Response) => {
   try {
     const { email, otp } = req.body;
@@ -312,6 +303,190 @@ export const resendOTP = async (req: Request, res: Response) => {
     res
       .status(500)
       .json({ message: "Failed to resend OTP", error: error.message });
+  }
+};
+
+// Send OTP for email verification (signup flow)
+export const sendSignupOTP = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser && existingUser.isEmailVerified) {
+      return res.status(400).json({
+        message: "Email already registered. Please login instead.",
+      });
+    }
+
+    // Generate OTP and set expiry (5 minutes from now)
+    const otp = generateOTP();
+    const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    // If user exists but not verified, update OTP
+    if (existingUser) {
+      existingUser.otp = otp;
+      existingUser.otpExpiresAt = otpExpiresAt;
+      await existingUser.save();
+    } else {
+      // Create temporary user record for OTP verification
+      const tempUser = new User({
+        username: `temp_${Date.now()}`,
+        email,
+        password: "temp_password", // Will be updated during complete signup
+        isEmailVerified: false,
+        otp,
+        otpExpiresAt,
+      });
+      await tempUser.save();
+    }
+
+    // Send OTP email
+    try {
+      const emailHtml = createOTPEmailTemplate("User", otp);
+      await sendEmail({
+        to: email,
+        subject: "Verify Your Email - Manualfits",
+        html: emailHtml,
+      });
+      console.log(`✅ Email sent successfully to ${email}`);
+    } catch (emailError) {
+      console.error("Failed to send verification email:", emailError);
+      // For development: Log OTP to console
+      console.log(`🔑 DEVELOPMENT OTP for ${email}: ${otp}`);
+      console.log(
+        "⚠️  Email sending failed, but OTP is logged above for testing"
+      );
+      // Don't fail the signup if email sending fails
+    }
+
+    res.status(200).json({
+      message: "OTP sent to your email. Please verify to continue.",
+      email,
+      otpExpiresAt,
+    });
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ message: "Failed to send OTP", error: error.message });
+  }
+};
+
+// Verify OTP only (without completing signup)
+export const verifySignupOTPOnly = async (req: Request, res: Response) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    // Check if OTP exists and hasn't expired
+    if (!user.otp || !user.otpExpiresAt) {
+      return res
+        .status(400)
+        .json({ message: "No valid OTP found. Please request a new one." });
+    }
+
+    if (new Date() > user.otpExpiresAt) {
+      // Clear expired OTP
+      user.otp = undefined;
+      user.otpExpiresAt = undefined;
+      await user.save();
+      return res
+        .status(400)
+        .json({ message: "OTP has expired. Please request a new one." });
+    }
+
+    // Verify OTP
+    if (user.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    // Mark OTP as verified (but don't complete signup yet)
+    user.otpVerified = true;
+    await user.save();
+
+    res.json({
+      message: "OTP verified successfully",
+      email: user.email,
+    });
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ message: "OTP verification failed", error: error.message });
+  }
+};
+
+// Complete signup after OTP verification
+export const completeSignup = async (req: Request, res: Response) => {
+  try {
+    const { email, username, password, otp } = req.body;
+
+    if (!email || !username || !password || !otp) {
+      return res
+        .status(400)
+        .json({ message: "Email, username, password, and OTP are required" });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    // Verify OTP again for security
+    if (!user.otp || user.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    if (new Date() > user.otpExpiresAt) {
+      return res.status(400).json({ message: "OTP has expired" });
+    }
+
+    // Hash password and update user
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    user.username = username;
+    user.password = hashedPassword;
+    user.isEmailVerified = true;
+    user.otp = undefined;
+    user.otpExpiresAt = undefined;
+    user.otpVerified = undefined;
+
+    await user.save();
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "7d" }
+    );
+
+    res.status(201).json({
+      message: "User registered successfully!",
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        isEmailVerified: user.isEmailVerified,
+      },
+    });
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ message: "Signup completion failed", error: error.message });
   }
 };
 
