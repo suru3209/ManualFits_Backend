@@ -7,8 +7,8 @@ exports.requestLogger = exports.securityHeaders = exports.simpleCors = exports.c
 const cors_1 = __importDefault(require("cors"));
 const corsOptions = {
     origin: [
-        process.env.FRONTEND_URL || "https://manualfits.com",
-        "https://www.manualfits.com",
+        process.env.FRONTEND_URL || "https://www.manualfits.com",
+        "https://manualfits.com",
         "http://localhost:3000",
         "http://localhost:3001",
         "https://manualfits.vercel.app",
@@ -39,6 +39,7 @@ const simpleCors = (req, res, next) => {
     const allowedOrigins = [
         process.env.FRONTEND_URL || "https://manualfits.com",
         "https://www.manualfits.com",
+        "https://manualfits.com",
         "https://manual-fits-frontend-x94h.vercel.app",
         "http://localhost:3000",
         "http://localhost:3001",
@@ -56,7 +57,13 @@ const simpleCors = (req, res, next) => {
     }
     else {
         console.log("CORS: ❌ Origin not allowed:", origin);
-        res.setHeader("Access-Control-Allow-Origin", "https://manualfits.com");
+        if (origin && origin.includes("manualfits.com")) {
+            res.setHeader("Access-Control-Allow-Origin", origin);
+            console.log("CORS: ✅ Allowing manualfits.com domain:", origin);
+        }
+        else {
+            res.setHeader("Access-Control-Allow-Origin", "https://manualfits.com");
+        }
     }
     res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control,Pragma,X-API-Key");

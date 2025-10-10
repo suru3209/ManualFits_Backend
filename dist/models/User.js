@@ -78,6 +78,10 @@ const UserSchema = new mongoose_1.Schema({
     phone: { type: String },
     dob: { type: Date },
     gender: { type: String, enum: ["Male", "Female", "Other"] },
+    isEmailVerified: { type: Boolean, default: false },
+    otp: { type: String },
+    otpExpiresAt: { type: Date },
+    otpVerified: { type: Boolean },
     addresses: [AddressSchema],
     saved_payments: {
         upi: [UPISchema],
