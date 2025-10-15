@@ -1,64 +1,71 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
-import Admin from "../models/Admin";
 import dotenv from "dotenv";
+import Admin from "../models/Admin";
 
 dotenv.config();
 
-const initAdmin = async () => {
+const createAdminUser = async () => {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI as string);
-    console.log("Connected to MongoDB");
+    await mongoose.connect(process.env.MONGO_URI || "");
 
     // Check if admin already exists
-    const existingAdmin = await Admin.findOne({ username: "suru3209" });
+    const existingAdmin = await Admin.findOne({ username: "admin" });
     if (existingAdmin) {
-      console.log("Admin user already exists");
+      console.log(
+        "Please use the existing credentials or create a new admin through the admin panel."
+      );
       return;
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash("Sury@108", 12);
+    // Create new admin user
+    const hashedPassword = await bcrypt.hash("admin123", 10);
 
-    // Create admin user
     const admin = new Admin({
-      username: "suru3209",
+      username: "admin",
+      email: "admin@manualfits.com",
       password: hashedPassword,
       role: "super_admin",
       permissions: [
-        "users.view",
-        "users.edit",
-        "users.delete",
-        "products.view",
         "products.create",
-        "products.edit",
+        "products.read",
+        "products.update",
         "products.delete",
-        "orders.view",
-        "orders.edit",
-        "reviews.view",
+        "orders.read",
+        "orders.update",
+        "users.read",
+        "users.update",
+        "users.delete",
+        "reviews.read",
+        "reviews.update",
         "reviews.delete",
-        "returns.view",
-        "returns.edit",
-        "admins.view",
+        "coupons.create",
+        "coupons.read",
+        "coupons.update",
+        "coupons.delete",
+        "analytics.read",
+        "settings.read",
+        "settings.update",
         "admins.create",
-        "admins.edit",
+        "admins.read",
+        "admins.update",
         "admins.delete",
+        "support.view",
+        "support.create",
+        "support.update",
+        "support.delete",
       ],
       isActive: true,
     });
 
     await admin.save();
-    console.log("Admin user created successfully");
-    console.log("Username: suru3209");
-    console.log("Password: Sury@108");
   } catch (error) {
-    console.error("Error initializing admin:", error);
+    console.error("❌ Error creating admin user:", error);
   } finally {
-    await mongoose.disconnect();
-    console.log("Disconnected from MongoDB");
+    await mongoose.connection.close();
   }
 };
 
 // Run the script
-initAdmin();
+createAdminUser();

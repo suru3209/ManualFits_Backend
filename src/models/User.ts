@@ -49,6 +49,7 @@ export interface IUser extends Document {
   dob?: Date; // ✅ Date of Birth
   gender?: "Male" | "Female" | "Other"; // ✅ Gender
   isEmailVerified: boolean; // Email verification status
+  isActive: boolean; // User account status
   otp?: string; // OTP for email verification
   otpExpiresAt?: Date; // OTP expiry time
   otpVerified?: boolean; // OTP verification status
@@ -63,6 +64,8 @@ export interface IUser extends Document {
   cart: Array<{
     productId: mongoose.Types.ObjectId;
     quantity: number;
+    size?: string;
+    color?: string;
     addedAt: Date;
   }>;
 
@@ -125,6 +128,7 @@ const UserSchema = new Schema<IUser>(
     dob: { type: Date },
     gender: { type: String, enum: ["Male", "Female", "Other"] },
     isEmailVerified: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
     otp: { type: String },
     otpExpiresAt: { type: Date },
     otpVerified: { type: Boolean },
@@ -144,6 +148,8 @@ const UserSchema = new Schema<IUser>(
           required: true,
         },
         quantity: { type: Number, required: true, min: 1 },
+        size: { type: String },
+        color: { type: String },
         addedAt: { type: Date, default: Date.now },
       },
     ],

@@ -9,7 +9,6 @@ const cloudinaryUpload_1 = require("../utils/cloudinaryUpload");
 const getUserProfile = async (req, res) => {
     try {
         const userId = req.user.id;
-        console.log("UserController - Getting profile for user:", userId);
         const user = await User_1.default.findById(userId);
         if (!user) {
             return res.status(404).json({ message: "User not found" });
@@ -24,10 +23,10 @@ const getUserProfile = async (req, res) => {
             dob: user.dob,
             gender: user.gender,
             addresses: user.addresses,
+            saved_payments: user.saved_payments,
             created_at: user.created_at,
             updated_at: user.updated_at,
         };
-        console.log("UserController - User profile:", userData);
         res.json({
             message: "User profile retrieved successfully",
             user: userData,
@@ -45,8 +44,6 @@ const updateUserProfile = async (req, res) => {
     try {
         const userId = req.user.id;
         const { username, email, phone, image, dob, gender } = req.body;
-        console.log("UserController - Updating profile for user:", userId);
-        console.log("UserController - Update data:", {
             username,
             email,
             phone,
@@ -83,7 +80,6 @@ const updateUserProfile = async (req, res) => {
             created_at: user.created_at,
             updated_at: user.updated_at,
         };
-        console.log("UserController - Updated user profile:", userData);
         res.json({
             message: "User profile updated successfully",
             user: userData,
@@ -101,7 +97,6 @@ const updateUserProfileImage = async (req, res) => {
     try {
         const userId = req.user.id;
         const { image, cloudinaryPublicId } = req.body;
-        console.log("UserController - Updating profile image for user:", userId);
         const user = await User_1.default.findById(userId);
         if (!user) {
             return res.status(404).json({ message: "User not found" });
@@ -125,7 +120,6 @@ const updateUserProfileImage = async (req, res) => {
             created_at: user.created_at,
             updated_at: user.updated_at,
         };
-        console.log("UserController - Updated user profile image:", userData);
         res.json({
             message: "User profile image updated successfully",
             user: userData,
@@ -133,9 +127,7 @@ const updateUserProfileImage = async (req, res) => {
     }
     catch (error) {
         console.error("Error updating user profile image:", error);
-        res
-            .status(500)
-            .json({
+        res.status(500).json({
             message: "Error updating user profile image",
             error: error.message,
         });

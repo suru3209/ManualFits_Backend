@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const addressController_1 = require("../controllers/addressController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const router = (0, express_1.Router)();
+router.use(authMiddleware_1.authMiddleware);
+router.get("/", addressController_1.getAddresses);
+router.post("/", addressController_1.addAddress);
+router.put("/:addressId", addressController_1.updateAddress);
+router.delete("/:addressId", addressController_1.deleteAddress);
+router.patch("/:addressId/default", addressController_1.setDefaultAddress);
+exports.default = router;

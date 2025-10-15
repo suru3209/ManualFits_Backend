@@ -10,7 +10,6 @@ import {
   requestLogger,
 } from "./middleware/corsMiddleware";
 import Product from "./models/ProductModal";
-import HiddenProducts from "./models/HiddenProducts";
 import authRoutes from "./routes/authRoutes";
 import cartRoutes from "./routes/cartRoutes";
 import wishlistRoutes from "./routes/wishlistRoutes";
@@ -22,7 +21,13 @@ import uploadRoutes from "./routes/uploadRoutes";
 import reviewRoutes from "./routes/reviewRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import chatRoutes from "./routes/chatRoutes";
+import supportRoutes from "./routes/supportRoutes";
+import couponRoutes from "./routes/couponRoutes";
+import settingsRoutes from "./routes/settingsRoutes";
+import productVariantRoutes from "./routes/productVariantRoutes";
 import { SocketHandler } from "./socket/socketHandler";
+import { AutoReplyService } from "./utils/autoReplyService";
+import { setSocketInstance } from "./controllers/supportController";
 
 dotenv.config();
 
@@ -57,6 +62,9 @@ const io = new SocketIOServer(server, {
 
 // Initialize socket handler
 const socketHandler = new SocketHandler(io);
+
+// Set socket instance for support controller
+setSocketInstance(io);
 // Middleware setup
 app.use(requestLogger);
 app.use(simpleCors); // Use simple CORS middleware
@@ -75,64 +83,75 @@ app.use("/api/user", paymentRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin/coupons", couponRoutes);
+app.use("/api/admin/settings", settingsRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/support", supportRoutes);
+app.use("/api/products", productVariantRoutes);
 
 // MongoDB connection with better error handling and timeout settings
-mongoose
-  .connect(process.env.MONGO_URI || "", {
-    serverSelectionTimeoutMS: 30000, // 30 seconds timeout
-    socketTimeoutMS: 45000, // 45 seconds timeout
-    connectTimeoutMS: 30000, // 30 seconds timeout
-    maxPoolSize: 10, // Maintain up to 10 socket connections
-    minPoolSize: 5, // Maintain a minimum of 5 socket connections
-    maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
-  })
-  .then(() => {
-    console.log("✅ MongoDB Connected successfully");
-    console.log("📊 Database state:", mongoose.connection.readyState);
-  })
-  .catch((err) => {
-    console.error("❌ MongoDB Connection Error:", err);
-    console.log(
-      "🔍 Connection string:",
-      process.env.MONGO_URI ? "Present" : "Missing"
-    );
+// Only connect if not in test environment
+if (process.env.NODE_ENV !== "test") {
+  mongoose
+    .connect(process.env.MONGO_URI || "", {
+      serverSelectionTimeoutMS: 30000, // 30 seconds timeout
+      socketTimeoutMS: 45000, // 45 seconds timeout
+      connectTimeoutMS: 30000, // 30 seconds timeout
+      maxPoolSize: 10, // Maintain up to 10 socket connections
+      minPoolSize: 5, // Maintain a minimum of 5 socket connections
+      maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
+    })
+    .then(() => {
+      console.log("✅ MongoDB connected successfully");
+    })
+    .catch((err) => {
+      console.error("❌ MongoDB Connection Error:", err);
+      console.log(
+        "🔍 Connection string:",
+        process.env.MONGO_URI ? "Present" : "Missing"
+      );
+    });
+
+  // MongoDB connection event listeners
+  mongoose.connection.on("connected", () => {
+    console.log("🔗 Mongoose connected to MongoDB");
   });
 
-// MongoDB connection event listeners
-mongoose.connection.on("connected", () => {
-  console.log("🔗 Mongoose connected to MongoDB Atlas");
-});
+  mongoose.connection.on("error", (err) => {
+    console.error("❌ Mongoose connection error:", err);
+  });
+}
 
-mongoose.connection.on("error", (err) => {
-  console.error("❌ Mongoose connection error:", err);
-});
-
-mongoose.connection.on("disconnected", () => {
-  console.log("🔌 Mongoose disconnected from MongoDB Atlas");
-});
+mongoose.connection.on("disconnected", () => {});
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
   await mongoose.connection.close();
-  console.log("🔌 MongoDB connection closed through app termination");
   process.exit(0);
 });
 
-// Get all products endpoint
+// Get all products endpoint (customer-facing)
 app.get("/products", async (req, res) => {
   try {
-    // Get list of hidden product names
-    const hiddenProductsDoc = await HiddenProducts.findOne();
-    const hiddenProductNames = hiddenProductsDoc?.productNames || [];
+    const { admin } = req.query;
 
-    // Fetch all products except those in hidden list
-    const products = await Product.find({
-      name: { $nin: hiddenProductNames },
-    });
+    let query: any = {};
+
+    // If admin=true query parameter is provided, return all products
+    // Otherwise, return only active and in-stock products for customers
+    if (admin !== "true") {
+      query = {
+        status: "active",
+        inStock: true,
+      };
+    }
+
+    const products = await Product.find(query).sort({ createdAt: -1 });
 
     console.log(
-      `✅ Found ${products.length} products (${hiddenProductNames.length} hidden)`
+      `✅ Found ${products.length} ${
+        admin === "true" ? "total" : "active"
+      } products`
     );
 
     res.status(200).json({
@@ -149,28 +168,32 @@ app.get("/products", async (req, res) => {
   }
 });
 
-// Get single product endpoint
+// Get single product endpoint (customer-facing)
 app.get("/products/:id", async (req, res) => {
   try {
     const { id } = req.params;
+    const { admin } = req.query;
 
-    // Get list of hidden product names
-    const hiddenProductsDoc = await HiddenProducts.findOne();
-    const hiddenProductNames = hiddenProductsDoc?.productNames || [];
+    let query: any = { _id: id };
 
-    // Find product and check if it's not in hidden list
-    const product = await Product.findById(id);
+    // If admin=true query parameter is provided, return product regardless of status
+    // Otherwise, only return if it's active and in stock
+    if (admin !== "true") {
+      query = {
+        _id: id,
+        status: "active",
+        inStock: true,
+      };
+    }
+
+    const product = await Product.findOne(query);
 
     if (!product) {
       return res.status(404).json({
-        message: "Product not found",
-      });
-    }
-
-    // Check if product is hidden
-    if (hiddenProductNames.includes(product.name)) {
-      return res.status(404).json({
-        message: "Product not found",
+        message:
+          admin === "true"
+            ? "Product not found"
+            : "Product not found or not available",
       });
     }
 
@@ -297,8 +320,13 @@ app.post("/test-upload", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🔌 Socket.io server initialized`);
-});
+// Only start server if not in test environment
+if (process.env.NODE_ENV !== "test") {
+  const PORT = process.env.PORT || 8080;
+  server.listen(PORT, () => {
+    // Start auto-reply service
+    AutoReplyService.startLateResponseChecker();
+  });
+}
+
+export default app;

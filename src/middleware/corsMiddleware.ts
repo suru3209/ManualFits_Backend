@@ -3,15 +3,29 @@ import { Request, Response, NextFunction } from "express";
 
 // CORS configuration
 const corsOptions = {
-  origin: [
-    process.env.FRONTEND_URL || "https://www.manualfits.com",
-    "https://manualfits.com",
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "https://manualfits.vercel.app",
-    "https://manualfits-git-main-surya3209.vercel.app",
-    "https://manualfits-git-develop-surya3209.vercel.app",
-  ],
+  origin: function (origin: string | undefined, callback: Function) {
+    // Define allowed origins
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || "https://www.manualfits.com",
+      "https://manualfits.com",
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "https://manualfits.vercel.app",
+      "https://manualfits-git-main-surya3209.vercel.app",
+      "https://manualfits-git-develop-surya3209.vercel.app",
+    ];
+
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: [
     "Origin",
@@ -35,7 +49,6 @@ export const corsMiddleware = cors(corsOptions);
 // Simple CORS middleware that definitely works
 export const simpleCors = (req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
-  console.log("CORS: Processing request from origin:", origin);
 
   // Define allowed origins
   const allowedOrigins = [
@@ -53,20 +66,24 @@ export const simpleCors = (req: Request, res: Response, next: NextFunction) => {
   // Check if origin is allowed
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
-    console.log("CORS: ✅ Allowed origin:", origin);
   } else if (!origin) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    console.log("CORS: ✅ No origin, using wildcard");
+    // For requests with no origin, use localhost for development or main domain for production
+    const defaultOrigin =
+      process.env.NODE_ENV === "production"
+        ? "https://manualfits.com"
+        : "http://localhost:3000";
+    res.setHeader("Access-Control-Allow-Origin", defaultOrigin);
   } else {
-    console.log("CORS: ❌ Origin not allowed:", origin);
     // For production, allow the main domain even if not in list
     if (origin && origin.includes("manualfits.com")) {
       res.setHeader("Access-Control-Allow-Origin", origin);
-      console.log("CORS: ✅ Allowing manualfits.com domain:", origin);
     } else {
       // Still set headers but with a default origin
-      res.setHeader("Access-Control-Allow-Origin", "https://manualfits.com");
+      const defaultOrigin =
+        process.env.NODE_ENV === "production"
+          ? "https://manualfits.com"
+          : "http://localhost:3000";
+      res.setHeader("Access-Control-Allow-Origin", defaultOrigin);
     }
   }
 
@@ -83,7 +100,6 @@ export const simpleCors = (req: Request, res: Response, next: NextFunction) => {
 
   // Handle preflight requests
   if (req.method === "OPTIONS") {
-    console.log("CORS: Handling preflight request");
     res.status(200).end();
     return;
   }
@@ -132,7 +148,6 @@ export const requestLogger = (
     if (res.statusCode >= 400) {
       console.error(`❌ ${logMessage}`);
     } else {
-      console.log(`✅ ${logMessage}`);
     }
   });
 

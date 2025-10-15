@@ -1,20 +1,22 @@
-import { Schema, model, Document, Types } from "mongoose";
+import mongoose, { Schema, Document, Types } from "mongoose";
 
-export interface IReturnReplace extends Document {
-  order: Types.ObjectId; // kaunse order se request aayi
-  user: Types.ObjectId; // kaun request kar raha
-  items: {
-    product: Types.ObjectId;
-    reason: string;
-    quantity: number;
-  }[];
-  type: "return" | "replace"; // return ya replace
-  status: "requested" | "approved" | "rejected" | "completed";
-  createdAt?: Date;
-  updatedAt?: Date;
+export interface IReturnReplaceItem {
+  product: Types.ObjectId;
+  reason: string;
+  quantity: number;
 }
 
-const ReturnReplaceItemSchema = new Schema(
+export interface IReturnReplace extends Document {
+  order: Types.ObjectId;
+  user: Types.ObjectId;
+  items: IReturnReplaceItem[];
+  type: "return" | "replace";
+  status: "requested" | "approved" | "rejected" | "completed";
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const ReturnReplaceItemSchema = new Schema<IReturnReplaceItem>(
   {
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
     reason: { type: String, required: true },
@@ -38,7 +40,8 @@ const ReturnReplaceSchema = new Schema<IReturnReplace>(
   { timestamps: true }
 );
 
-export const ReturnReplace = model<IReturnReplace>(
+export const ReturnReplace = mongoose.model<IReturnReplace>(
   "ReturnReplace",
   ReturnReplaceSchema
 );
+export default ReturnReplace;

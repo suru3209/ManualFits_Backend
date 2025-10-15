@@ -1,9 +1,42 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAdminPermissions = exports.getPermissions = exports.deleteAdmin = exports.updateAdmin = exports.createAdmin = exports.getAllAdmins = exports.deleteProduct = exports.getProduct = exports.updateProduct = exports.createProduct = exports.updateReturnReplaceStatus = exports.getReturnReplaceRequests = exports.deleteReview = exports.getAllReviews = exports.updateProductStatus = exports.getAllProducts = exports.updateOrderStatus = exports.getAllOrders = exports.getAllUsers = exports.getDashboardStats = exports.adminLogin = void 0;
+exports.getPublicPaymentSettings = exports.adminImageUpload = exports.updatePaymentSettings = exports.getPaymentSettings = exports.updateAdminPermissions = exports.getPermissions = exports.deleteAdmin = exports.updateAdmin = exports.createAdmin = exports.getAllAdmins = exports.deleteProduct = exports.getProduct = exports.updateProduct = exports.createProduct = exports.updateReturnReplaceStatus = exports.getReturnReplaceRequests = exports.deleteReview = exports.getAllReviews = exports.updateProductStatus = exports.getAllProducts = exports.updateOrderStatus = exports.getAllOrders = exports.getAllUsers = exports.getDashboardStats = exports.adminLogin = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const Admin_1 = __importDefault(require("../models/Admin"));
@@ -44,9 +77,10 @@ const adminLogin = async (req, res) => {
         });
     }
     catch (error) {
-        res
-            .status(500)
-            .json({ message: "Admin login failed", error: error.message });
+        res.status(500).json({
+            message: "Admin login failed",
+            error: error instanceof Error ? error.message : error,
+        });
     }
 };
 exports.adminLogin = adminLogin;
@@ -65,7 +99,7 @@ const getDashboardStats = async (req, res) => {
             ]),
             Order_1.Order.find()
                 .populate("user", "username email")
-                .populate("items.product", "name images")
+                .populate("items.product", "title variants")
                 .sort({ createdAt: -1 })
                 .limit(10),
         ]);
@@ -87,7 +121,7 @@ const getDashboardStats = async (req, res) => {
     catch (error) {
         res.status(500).json({
             message: "Error fetching dashboard stats",
-            error: error.message,
+            error: error instanceof Error ? error.message : error,
         });
     }
 };
@@ -121,9 +155,10 @@ const getAllUsers = async (req, res) => {
         });
     }
     catch (error) {
-        res
-            .status(500)
-            .json({ message: "Error fetching users", error: error.message });
+        res.status(500).json({
+            message: "Error fetching users",
+            error: error instanceof Error ? error.message : error,
+        });
     }
 };
 exports.getAllUsers = getAllUsers;
@@ -134,7 +169,7 @@ const getAllOrders = async (req, res) => {
         const query = status ? { status } : {};
         const orders = await Order_1.Order.find(query)
             .populate("user", "username email")
-            .populate("items.product", "name images price")
+            .populate("items.product", "title variants")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(Number(limit));
@@ -150,9 +185,10 @@ const getAllOrders = async (req, res) => {
         });
     }
     catch (error) {
-        res
-            .status(500)
-            .json({ message: "Error fetching orders", error: error.message });
+        res.status(500).json({
+            message: "Error fetching orders",
+            error: error instanceof Error ? error.message : error,
+        });
     }
 };
 exports.getAllOrders = getAllOrders;
@@ -170,25 +206,29 @@ const updateOrderStatus = async (req, res) => {
         });
     }
     catch (error) {
-        res
-            .status(500)
-            .json({ message: "Error updating order status", error: error.message });
+        res.status(500).json({
+            message: "Error updating order status",
+            error: error instanceof Error ? error.message : error,
+        });
     }
 };
 exports.updateOrderStatus = updateOrderStatus;
 const getAllProducts = async (req, res) => {
     try {
-        const { page = 1, limit = 10, search = "", category = "" } = req.query;
+        const { page = 1, limit = 10, search = "", category = "", status = "", } = req.query;
         const skip = (Number(page) - 1) * Number(limit);
         const query = {};
         if (search) {
             query.$or = [
-                { name: { $regex: search, $options: "i" } },
+                { title: { $regex: search, $options: "i" } },
                 { brand: { $regex: search, $options: "i" } },
             ];
         }
         if (category) {
             query.category = category;
+        }
+        if (status) {
+            query.status = status;
         }
         const products = await ProductModal_1.default.find(query)
             .sort({ createdAt: -1 })
@@ -206,9 +246,10 @@ const getAllProducts = async (req, res) => {
         });
     }
     catch (error) {
-        res
-            .status(500)
-            .json({ message: "Error fetching products", error: error.message });
+        res.status(500).json({
+            message: "Error fetching products",
+            error: error instanceof Error ? error.message : error,
+        });
     }
 };
 exports.getAllProducts = getAllProducts;
@@ -216,13 +257,10 @@ const updateProductStatus = async (req, res) => {
     try {
         const { productId } = req.params;
         const { status } = req.body;
-        console.log("Updating product status:", { productId, status });
         const product = await ProductModal_1.default.findByIdAndUpdate(productId, { status }, { new: true });
         if (!product) {
-            console.log("Product not found:", productId);
             return res.status(404).json({ message: "Product not found" });
         }
-        console.log("Product status updated successfully:", product.status);
         res.json({
             message: "Product status updated successfully",
             product,
@@ -230,9 +268,10 @@ const updateProductStatus = async (req, res) => {
     }
     catch (error) {
         console.error("Error updating product status:", error);
-        res
-            .status(500)
-            .json({ message: "Error updating product status", error: error.message });
+        res.status(500).json({
+            message: "Error updating product status",
+            error: error instanceof Error ? error.message : error,
+        });
     }
 };
 exports.updateProductStatus = updateProductStatus;
@@ -242,7 +281,7 @@ const getAllReviews = async (req, res) => {
         const skip = (Number(page) - 1) * Number(limit);
         const reviews = await Review_1.default.find()
             .populate("user", "username email")
-            .populate("product", "name images")
+            .populate("product", "title variants")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(Number(limit));
@@ -258,9 +297,10 @@ const getAllReviews = async (req, res) => {
         });
     }
     catch (error) {
-        res
-            .status(500)
-            .json({ message: "Error fetching reviews", error: error.message });
+        res.status(500).json({
+            message: "Error fetching reviews",
+            error: error instanceof Error ? error.message : error,
+        });
     }
 };
 exports.getAllReviews = getAllReviews;
@@ -276,9 +316,10 @@ const deleteReview = async (req, res) => {
         });
     }
     catch (error) {
-        res
-            .status(500)
-            .json({ message: "Error deleting review", error: error.message });
+        res.status(500).json({
+            message: "Error deleting review",
+            error: error instanceof Error ? error.message : error,
+        });
     }
 };
 exports.deleteReview = deleteReview;
@@ -290,7 +331,7 @@ const getReturnReplaceRequests = async (req, res) => {
         const requests = await ReturnReplace_1.ReturnReplace.find(query)
             .populate("user", "username email")
             .populate("order", "totalAmount status")
-            .populate("items.product", "name images")
+            .populate("items.product", "title variants")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(Number(limit));
@@ -308,7 +349,7 @@ const getReturnReplaceRequests = async (req, res) => {
     catch (error) {
         res.status(500).json({
             message: "Error fetching return/replace requests",
-            error: error.message,
+            error: error instanceof Error ? error.message : error,
         });
     }
 };
@@ -329,7 +370,7 @@ const updateReturnReplaceStatus = async (req, res) => {
     catch (error) {
         res.status(500).json({
             message: "Error updating return/replace status",
-            error: error.message,
+            error: error instanceof Error ? error.message : error,
         });
     }
 };
@@ -337,6 +378,12 @@ exports.updateReturnReplaceStatus = updateReturnReplaceStatus;
 const createProduct = async (req, res) => {
     try {
         const productData = req.body;
+            title: productData.title,
+            brand: productData.brand,
+            category: productData.category,
+            variantsCount: productData.variants?.length || 0,
+            cloudinaryPublicIdsCount: productData.cloudinaryPublicIds?.length || 0,
+        });
         const product = new ProductModal_1.default(productData);
         await product.save();
         res.status(201).json({
@@ -345,9 +392,10 @@ const createProduct = async (req, res) => {
         });
     }
     catch (error) {
+        console.error("Error creating product:", error);
         res.status(500).json({
             message: "Error creating product",
-            error: error.message,
+            error: error instanceof Error ? error.message : error,
         });
     }
 };
@@ -371,7 +419,7 @@ const updateProduct = async (req, res) => {
     catch (error) {
         res.status(500).json({
             message: "Error updating product",
-            error: error.message,
+            error: error instanceof Error ? error.message : error,
         });
     }
 };
@@ -391,7 +439,7 @@ const getProduct = async (req, res) => {
     catch (error) {
         res.status(500).json({
             message: "Error fetching product",
-            error: error.message,
+            error: error instanceof Error ? error.message : error,
         });
     }
 };
@@ -410,7 +458,7 @@ const deleteProduct = async (req, res) => {
     catch (error) {
         res.status(500).json({
             message: "Error deleting product",
-            error: error.message,
+            error: error instanceof Error ? error.message : error,
         });
     }
 };
@@ -484,7 +532,7 @@ exports.createAdmin = createAdmin;
 const updateAdmin = async (req, res) => {
     try {
         const { adminId } = req.params;
-        const { username, email, role, isActive } = req.body;
+        const { username, email, role, permissions, isActive } = req.body;
         const admin = await Admin_1.default.findById(adminId);
         if (!admin) {
             return res.status(404).json({ message: "Admin not found" });
@@ -506,6 +554,8 @@ const updateAdmin = async (req, res) => {
             admin.email = email;
         if (role)
             admin.role = role;
+        if (permissions)
+            admin.permissions = permissions;
         if (typeof isActive === "boolean")
             admin.isActive = isActive;
         await admin.save();
@@ -697,3 +747,123 @@ const updateAdminPermissions = async (req, res) => {
     }
 };
 exports.updateAdminPermissions = updateAdminPermissions;
+const getPaymentSettings = async (req, res) => {
+    try {
+        const adminId = req.admin.id;
+        const admin = await Admin_1.default.findById(adminId).select("paymentSettings");
+        if (!admin) {
+            return res.status(404).json({ message: "Admin not found" });
+        }
+        res.json({
+            message: "Payment settings retrieved successfully",
+            paymentSettings: admin.paymentSettings || {
+                qrCodes: [],
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error fetching payment settings:", error);
+        res.status(500).json({
+            message: "Error fetching payment settings",
+            error: error instanceof Error ? error.message : error,
+        });
+    }
+};
+exports.getPaymentSettings = getPaymentSettings;
+const updatePaymentSettings = async (req, res) => {
+    try {
+        const adminId = req.admin.id;
+        const { paymentSettings } = req.body;
+        const admin = await Admin_1.default.findByIdAndUpdate(adminId, { paymentSettings }, { new: true }).select("paymentSettings");
+        if (!admin) {
+            return res.status(404).json({ message: "Admin not found" });
+        }
+        res.json({
+            message: "Payment settings updated successfully",
+            paymentSettings: admin.paymentSettings,
+        });
+    }
+    catch (error) {
+        console.error("Error updating payment settings:", error);
+        res.status(500).json({
+            message: "Error updating payment settings",
+            error: error instanceof Error ? error.message : error,
+        });
+    }
+};
+exports.updatePaymentSettings = updatePaymentSettings;
+const adminImageUpload = async (req, res) => {
+    try {
+            hasFile: !!req.file,
+            fileSize: req.file?.size,
+            fileType: req.file?.mimetype,
+            fileName: req.file?.originalname,
+        });
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "No image file provided",
+            });
+        }
+        if (!req.file.mimetype.startsWith("image/")) {
+            return res.status(400).json({
+                success: false,
+                message: "Only image files are allowed",
+            });
+        }
+        const { uploadToCloudinary } = await Promise.resolve().then(() => __importStar(require("../utils/cloudinaryUpload")));
+        const result = await uploadToCloudinary(req.file, "manualfits/payment");
+        if (result.success) {
+            res.status(200).json({
+                success: true,
+                message: "Image uploaded successfully",
+                secure_url: result.url,
+                public_id: result.public_id,
+            });
+        }
+        else {
+            console.error("Admin upload - Upload failed:", result.error);
+            res.status(500).json({
+                success: false,
+                message: "Upload failed",
+                error: result.error,
+            });
+        }
+    }
+    catch (error) {
+        console.error("Admin upload - Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Upload failed",
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+};
+exports.adminImageUpload = adminImageUpload;
+const getPublicPaymentSettings = async (req, res) => {
+    try {
+        const admin = await Admin_1.default.findOne({
+            paymentSettings: { $exists: true, $ne: null },
+        }).select("paymentSettings");
+        if (!admin || !admin.paymentSettings) {
+            return res.status(404).json({
+                message: "Payment settings not found",
+                paymentSettings: null,
+            });
+        }
+        res.json({
+            message: "Payment settings retrieved successfully",
+            paymentSettings: {
+                qrCodes: admin.paymentSettings.qrCodes || [],
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error fetching public payment settings:", error);
+        res.status(500).json({
+            message: "Error fetching payment settings",
+            error: error instanceof Error ? error.message : error,
+        });
+    }
+};
+exports.getPublicPaymentSettings = getPublicPaymentSettings;

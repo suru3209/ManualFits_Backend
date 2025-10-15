@@ -8,28 +8,32 @@ import { Order } from "../models/Order";
 import Review from "../models/Review";
 import { ReturnReplace } from "../models/ReturnReplace";
 
-// Admin Login
+interface AdminRequest extends Request {
+  admin?: {
+    id: string;
+    username: string;
+    role: string;
+    permissions: string[];
+  };
+}
+
 export const adminLogin = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
-
-    // Find admin by username
     const admin = await Admin.findOne({ username, isActive: true });
+
     if (!admin) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Compare password
     const isMatch = await bcrypt.compare(password, admin.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Update last login
     admin.lastLogin = new Date();
     await admin.save();
 
-    // Generate JWT token
     const token = jwt.sign(
       {
         id: admin._id,
@@ -52,14 +56,14 @@ export const adminLogin = async (req: Request, res: Response) => {
         lastLogin: admin.lastLogin,
       },
     });
-  } catch (error: any) {
-    res
-      .status(500)
-      .json({ message: "Admin login failed", error: error.message });
+  } catch (error) {
+    res.status(500).json({
+      message: "Admin login failed",
+      error: error instanceof Error ? error.message : error,
+    });
   }
 };
 
-// Get Dashboard Stats
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const [
@@ -84,7 +88,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       ]),
       Order.find()
         .populate("user", "username email")
-        .populate("items.product", "name images")
+        .populate("items.product", "title variants")
         .sort({ createdAt: -1 })
         .limit(10),
     ]);
@@ -104,15 +108,14 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         recentOrders,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({
       message: "Error fetching dashboard stats",
-      error: error.message,
+      error: error instanceof Error ? error.message : error,
     });
   }
 };
 
-// Get All Users
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
     const { page = 1, limit = 10, search = "" } = req.query;
@@ -144,24 +147,23 @@ export const getAllUsers = async (req: Request, res: Response) => {
         total,
       },
     });
-  } catch (error: any) {
-    res
-      .status(500)
-      .json({ message: "Error fetching users", error: error.message });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching users",
+      error: error instanceof Error ? error.message : error,
+    });
   }
 };
 
-// Get All Orders
 export const getAllOrders = async (req: Request, res: Response) => {
   try {
     const { page = 1, limit = 10, status = "" } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-
     const query = status ? { status } : {};
 
     const orders = await Order.find(query)
       .populate("user", "username email")
-      .populate("items.product", "name images price")
+      .populate("items.product", "title variants")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -177,14 +179,14 @@ export const getAllOrders = async (req: Request, res: Response) => {
         total,
       },
     });
-  } catch (error: any) {
-    res
-      .status(500)
-      .json({ message: "Error fetching orders", error: error.message });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching orders",
+      error: error instanceof Error ? error.message : error,
+    });
   }
 };
 
-// Update Order Status
 export const updateOrderStatus = async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
@@ -204,28 +206,40 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       message: "Order status updated successfully",
       order,
     });
-  } catch (error: any) {
-    res
-      .status(500)
-      .json({ message: "Error updating order status", error: error.message });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error updating order status",
+      error: error instanceof Error ? error.message : error,
+    });
   }
 };
 
-// Get All Products
 export const getAllProducts = async (req: Request, res: Response) => {
   try {
-    const { page = 1, limit = 10, search = "", category = "" } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+      category = "",
+      status = "",
+    } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     const query: any = {};
+
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: "i" } },
+        { title: { $regex: search, $options: "i" } },
         { brand: { $regex: search, $options: "i" } },
       ];
     }
+
     if (category) {
       query.category = category;
+    }
+
+    if (status) {
+      query.status = status;
     }
 
     const products = await Product.find(query)
@@ -244,20 +258,18 @@ export const getAllProducts = async (req: Request, res: Response) => {
         total,
       },
     });
-  } catch (error: any) {
-    res
-      .status(500)
-      .json({ message: "Error fetching products", error: error.message });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching products",
+      error: error instanceof Error ? error.message : error,
+    });
   }
 };
 
-// Update Product Status
 export const updateProductStatus = async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
     const { status } = req.body;
-
-    console.log("Updating product status:", { productId, status });
 
     const product = await Product.findByIdAndUpdate(
       productId,
@@ -266,24 +278,22 @@ export const updateProductStatus = async (req: Request, res: Response) => {
     );
 
     if (!product) {
-      console.log("Product not found:", productId);
       return res.status(404).json({ message: "Product not found" });
     }
 
-    console.log("Product status updated successfully:", product.status);
     res.json({
       message: "Product status updated successfully",
       product,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error updating product status:", error);
-    res
-      .status(500)
-      .json({ message: "Error updating product status", error: error.message });
+    res.status(500).json({
+      message: "Error updating product status",
+      error: error instanceof Error ? error.message : error,
+    });
   }
 };
 
-// Get All Reviews
 export const getAllReviews = async (req: Request, res: Response) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -291,7 +301,7 @@ export const getAllReviews = async (req: Request, res: Response) => {
 
     const reviews = await Review.find()
       .populate("user", "username email")
-      .populate("product", "name images")
+      .populate("product", "title variants")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -307,19 +317,19 @@ export const getAllReviews = async (req: Request, res: Response) => {
         total,
       },
     });
-  } catch (error: any) {
-    res
-      .status(500)
-      .json({ message: "Error fetching reviews", error: error.message });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching reviews",
+      error: error instanceof Error ? error.message : error,
+    });
   }
 };
 
-// Delete Review
 export const deleteReview = async (req: Request, res: Response) => {
   try {
     const { reviewId } = req.params;
-
     const review = await Review.findByIdAndDelete(reviewId);
+
     if (!review) {
       return res.status(404).json({ message: "Review not found" });
     }
@@ -327,25 +337,24 @@ export const deleteReview = async (req: Request, res: Response) => {
     res.json({
       message: "Review deleted successfully",
     });
-  } catch (error: any) {
-    res
-      .status(500)
-      .json({ message: "Error deleting review", error: error.message });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error deleting review",
+      error: error instanceof Error ? error.message : error,
+    });
   }
 };
 
-// Get Return/Replace Requests
 export const getReturnReplaceRequests = async (req: Request, res: Response) => {
   try {
     const { page = 1, limit = 10, status = "" } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-
     const query = status ? { status } : {};
 
     const requests = await ReturnReplace.find(query)
       .populate("user", "username email")
       .populate("order", "totalAmount status")
-      .populate("items.product", "name images")
+      .populate("items.product", "title variants")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -361,15 +370,14 @@ export const getReturnReplaceRequests = async (req: Request, res: Response) => {
         total,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({
       message: "Error fetching return/replace requests",
-      error: error.message,
+      error: error instanceof Error ? error.message : error,
     });
   }
 };
 
-// Update Return/Replace Status
 export const updateReturnReplaceStatus = async (
   req: Request,
   res: Response
@@ -392,20 +400,27 @@ export const updateReturnReplaceStatus = async (
       message: "Return/Replace status updated successfully",
       request,
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({
       message: "Error updating return/replace status",
-      error: error.message,
+      error: error instanceof Error ? error.message : error,
     });
   }
 };
 
-// Create Product
 export const createProduct = async (req: Request, res: Response) => {
   try {
     const productData = req.body;
 
-    // Create new product
+    // Log the incoming data to debug
+    console.log("Creating product with data:", {
+      title: productData.title,
+      brand: productData.brand,
+      category: productData.category,
+      variantsCount: productData.variants?.length || 0,
+      cloudinaryPublicIdsCount: productData.cloudinaryPublicIds?.length || 0,
+    });
+
     const product = new Product(productData);
     await product.save();
 
@@ -413,15 +428,15 @@ export const createProduct = async (req: Request, res: Response) => {
       message: "Product created successfully",
       product,
     });
-  } catch (error: any) {
+  } catch (error) {
+    console.error("Error creating product:", error);
     res.status(500).json({
       message: "Error creating product",
-      error: error.message,
+      error: error instanceof Error ? error.message : error,
     });
   }
 };
 
-// Update Product
 export const updateProduct = async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
@@ -440,19 +455,17 @@ export const updateProduct = async (req: Request, res: Response) => {
       message: "Product updated successfully",
       product,
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({
       message: "Error updating product",
-      error: error.message,
+      error: error instanceof Error ? error.message : error,
     });
   }
 };
 
-// Get Single Product
 export const getProduct = async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
-
     const product = await Product.findById(productId);
 
     if (!product) {
@@ -463,19 +476,17 @@ export const getProduct = async (req: Request, res: Response) => {
       message: "Product retrieved successfully",
       product,
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({
       message: "Error fetching product",
-      error: error.message,
+      error: error instanceof Error ? error.message : error,
     });
   }
 };
 
-// Delete Product
 export const deleteProduct = async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
-
     const product = await Product.findByIdAndDelete(productId);
 
     if (!product) {
@@ -485,17 +496,14 @@ export const deleteProduct = async (req: Request, res: Response) => {
     res.json({
       message: "Product deleted successfully",
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({
       message: "Error deleting product",
-      error: error.message,
+      error: error instanceof Error ? error.message : error,
     });
   }
 };
 
-// Admin Management Functions
-
-// Get all admins
 export const getAllAdmins = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
@@ -503,7 +511,7 @@ export const getAllAdmins = async (req: Request, res: Response) => {
     const skip = (page - 1) * limit;
 
     const admins = await Admin.find({})
-      .select("-password") // Exclude password from response
+      .select("-password")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -528,12 +536,10 @@ export const getAllAdmins = async (req: Request, res: Response) => {
   }
 };
 
-// Create new admin
 export const createAdmin = async (req: Request, res: Response) => {
   try {
     const { username, email, password, role, permissions } = req.body;
 
-    // Check if admin already exists
     const existingAdmin = await Admin.findOne({ username });
     if (existingAdmin) {
       return res
@@ -541,11 +547,9 @@ export const createAdmin = async (req: Request, res: Response) => {
         .json({ message: "Admin with this username already exists" });
     }
 
-    // Hash password
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create new admin
     const newAdmin = new Admin({
       username,
       email,
@@ -557,9 +561,8 @@ export const createAdmin = async (req: Request, res: Response) => {
 
     await newAdmin.save();
 
-    // Return admin without password
     const adminResponse = newAdmin.toObject();
-    delete adminResponse.password;
+    delete (adminResponse as any).password;
 
     res.status(201).json({
       message: "Admin created successfully",
@@ -574,18 +577,16 @@ export const createAdmin = async (req: Request, res: Response) => {
   }
 };
 
-// Update admin
 export const updateAdmin = async (req: Request, res: Response) => {
   try {
     const { adminId } = req.params;
-    const { username, email, role, isActive } = req.body;
+    const { username, email, role, permissions, isActive } = req.body;
 
     const admin = await Admin.findById(adminId);
     if (!admin) {
       return res.status(404).json({ message: "Admin not found" });
     }
 
-    // Check if username is being changed and if it already exists
     if (username && username !== admin.username) {
       const existingAdmin = await Admin.findOne({
         username,
@@ -598,17 +599,16 @@ export const updateAdmin = async (req: Request, res: Response) => {
       }
     }
 
-    // Update admin fields
     if (username) admin.username = username;
     if (email) admin.email = email;
     if (role) admin.role = role;
+    if (permissions) admin.permissions = permissions;
     if (typeof isActive === "boolean") admin.isActive = isActive;
 
     await admin.save();
 
-    // Return admin without password
     const adminResponse = admin.toObject();
-    delete adminResponse.password;
+    delete (adminResponse as any).password;
 
     res.json({
       message: "Admin updated successfully",
@@ -623,17 +623,15 @@ export const updateAdmin = async (req: Request, res: Response) => {
   }
 };
 
-// Delete admin
-export const deleteAdmin = async (req: Request, res: Response) => {
+export const deleteAdmin = async (req: AdminRequest, res: Response) => {
   try {
     const { adminId } = req.params;
-
     const admin = await Admin.findById(adminId);
+
     if (!admin) {
       return res.status(404).json({ message: "Admin not found" });
     }
 
-    // Prevent deleting the current admin
     if (admin._id.toString() === req.admin?.id) {
       return res
         .status(400)
@@ -654,7 +652,6 @@ export const deleteAdmin = async (req: Request, res: Response) => {
   }
 };
 
-// Get available permissions
 export const getPermissions = async (req: Request, res: Response) => {
   try {
     const permissions = [
@@ -775,7 +772,6 @@ export const getPermissions = async (req: Request, res: Response) => {
   }
 };
 
-// Update admin permissions
 export const updateAdminPermissions = async (req: Request, res: Response) => {
   try {
     const { adminId } = req.params;
@@ -789,9 +785,8 @@ export const updateAdminPermissions = async (req: Request, res: Response) => {
     admin.permissions = permissions;
     await admin.save();
 
-    // Return admin without password
     const adminResponse = admin.toObject();
-    delete adminResponse.password;
+    delete (adminResponse as any).password;
 
     res.json({
       message: "Admin permissions updated successfully",
@@ -801,6 +796,145 @@ export const updateAdminPermissions = async (req: Request, res: Response) => {
     console.error("Error updating admin permissions:", error);
     res.status(500).json({
       message: "Error updating admin permissions",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+// Get payment settings
+export const getPaymentSettings = async (req: Request, res: Response) => {
+  try {
+    const adminId = (req as any).admin.id;
+    const admin = await Admin.findById(adminId).select("paymentSettings");
+
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    res.json({
+      message: "Payment settings retrieved successfully",
+      paymentSettings: admin.paymentSettings || {
+        qrCodes: [],
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching payment settings:", error);
+    res.status(500).json({
+      message: "Error fetching payment settings",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+// Update payment settings
+export const updatePaymentSettings = async (req: Request, res: Response) => {
+  try {
+    const adminId = (req as any).admin.id;
+    const { paymentSettings } = req.body;
+
+    const admin = await Admin.findByIdAndUpdate(
+      adminId,
+      { paymentSettings },
+      { new: true }
+    ).select("paymentSettings");
+
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    res.json({
+      message: "Payment settings updated successfully",
+      paymentSettings: admin.paymentSettings,
+    });
+  } catch (error) {
+    console.error("Error updating payment settings:", error);
+    res.status(500).json({
+      message: "Error updating payment settings",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+// Admin image upload
+export const adminImageUpload = async (req: Request, res: Response) => {
+  try {
+    console.log("Admin upload - File received:", {
+      hasFile: !!req.file,
+      fileSize: req.file?.size,
+      fileType: req.file?.mimetype,
+      fileName: req.file?.originalname,
+    });
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No image file provided",
+      });
+    }
+
+    // Validate file
+    if (!req.file.mimetype.startsWith("image/")) {
+      return res.status(400).json({
+        success: false,
+        message: "Only image files are allowed",
+      });
+    }
+
+    // Import cloudinary upload function
+    const { uploadToCloudinary } = await import("../utils/cloudinaryUpload");
+
+    const result = await uploadToCloudinary(req.file, "manualfits/payment");
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: "Image uploaded successfully",
+        secure_url: result.url,
+        public_id: result.public_id,
+      });
+    } else {
+      console.error("Admin upload - Upload failed:", result.error);
+      res.status(500).json({
+        success: false,
+        message: "Upload failed",
+        error: result.error,
+      });
+    }
+  } catch (error) {
+    console.error("Admin upload - Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Upload failed",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
+// Get payment settings for order page (public endpoint)
+export const getPublicPaymentSettings = async (req: Request, res: Response) => {
+  try {
+    // Get the first admin with payment settings
+    const admin = await Admin.findOne({
+      paymentSettings: { $exists: true, $ne: null },
+    }).select("paymentSettings");
+
+    if (!admin || !admin.paymentSettings) {
+      return res.status(404).json({
+        message: "Payment settings not found",
+        paymentSettings: null,
+      });
+    }
+
+    res.json({
+      message: "Payment settings retrieved successfully",
+      paymentSettings: {
+        qrCodes: admin.paymentSettings.qrCodes || [],
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching public payment settings:", error);
+    res.status(500).json({
+      message: "Error fetching payment settings",
       error: error instanceof Error ? error.message : error,
     });
   }

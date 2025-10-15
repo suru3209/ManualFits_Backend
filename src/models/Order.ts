@@ -4,6 +4,8 @@ interface OrderItem {
   product: Types.ObjectId;
   quantity: number;
   price: number;
+  size?: string;
+  color?: string;
 }
 
 interface ShippingAddress {
@@ -22,8 +24,10 @@ export interface IOrder extends Document {
   shippingAddress: ShippingAddress;
   paymentMethod: string;
   totalAmount: number;
+  utrNumber?: string;
   status:
     | "pending"
+    | "Confirmed"
     | "delivered"
     | "cancelled"
     | "shipped"
@@ -39,6 +43,8 @@ const OrderItemSchema = new Schema<OrderItem>({
   product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
   quantity: { type: Number, required: true },
   price: { type: Number, required: true },
+  size: { type: String },
+  color: { type: String },
 });
 
 const ShippingAddressSchema = new Schema<ShippingAddress>({
@@ -58,6 +64,7 @@ const OrderSchema = new Schema<IOrder>(
     shippingAddress: { type: ShippingAddressSchema, required: true },
     paymentMethod: { type: String, required: true },
     totalAmount: { type: Number, required: true },
+    utrNumber: { type: String },
     status: {
       type: String,
       enum: [

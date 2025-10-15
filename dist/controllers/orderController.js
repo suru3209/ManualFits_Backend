@@ -1,16 +1,17 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.returnReplaceOrder = exports.cancelOrder = exports.updateOrderStatus = exports.createOrder = exports.getOrder = exports.getOrders = void 0;
 const Order_1 = require("../models/Order");
+const ProductModal_1 = __importDefault(require("../models/ProductModal"));
 const getOrders = async (req, res) => {
     try {
         const userId = req.user.id;
-        console.log("OrderController - Getting orders for user:", userId);
         const orders = await Order_1.Order.find({ user: userId })
-            .populate("items.product", "name price images")
+            .populate("items.product", "title variants")
             .sort({ createdAt: -1 });
-        console.log("OrderController - User orders:", orders);
-        console.log("OrderController - Orders length:", orders.length);
         res.json({
             message: "Orders retrieved successfully",
             orders: orders,
@@ -50,18 +51,22 @@ const getOrder = async (req, res) => {
 exports.getOrder = getOrder;
 const createOrder = async (req, res) => {
     try {
-        console.log("OrderController - createOrder called");
         const userId = req.user.id;
-        const { items, shippingAddress, paymentMethod, totalAmount } = req.body;
-        console.log("OrderController - Received data:", {
+        const { items, shippingAddress, paymentMethod, totalAmount, utrNumber } = req.body;
             userId,
             items,
             shippingAddress,
             paymentMethod,
             totalAmount,
+            utrNumber,
         });
+            productId: item.product,
+            quantity: item.quantity,
+            price: item.price,
+            size: item.size,
+            color: item.color
+        })));
         if (!items || !shippingAddress || !paymentMethod || !totalAmount) {
-            console.log("OrderController - Missing required fields:", {
                 items: !!items,
                 shippingAddress: !!shippingAddress,
                 paymentMethod: !!paymentMethod,
@@ -69,17 +74,70 @@ const createOrder = async (req, res) => {
             });
             return res.status(400).json({ message: "All order fields are required" });
         }
+        const stockUpdates = [];
+        for (const item of items) {
+            const product = await ProductModal_1.default.findById(item.product);
+            if (!product) {
+                return res
+                    .status(404)
+                    .json({ message: `Product not found: ${item.product}` });
+            }
+                productId: item.product,
+                productTitle: product.title,
+                totalStock: product.totalStock,
+                requestedQuantity: item.quantity,
+            });
+            if (product.totalStock < item.quantity) {
+                    productId: item.product,
+                    productTitle: product.title,
+                    available: product.totalStock,
+                    requested: item.quantity,
+                });
+                return res.status(400).json({
+                    message: `Insufficient stock for ${product.title}. Available: ${product.totalStock}, Requested: ${item.quantity}`,
+                });
+            }
+            stockUpdates.push({
+                productId: item.product,
+                newStock: product.totalStock - item.quantity,
+            });
+        }
+        try {
+            for (const update of stockUpdates) {
+                const result = await ProductModal_1.default.findByIdAndUpdate(update.productId, {
+                    $set: {
+                        totalStock: update.newStock,
+                    },
+                }, { new: true });
+                if (!result) {
+                    throw new Error(`Failed to update stock for product ${update.productId}`);
+                }
+            }
+        }
+        catch (stockError) {
+            console.error("OrderController - Stock update failed:", stockError);
+            return res.status(500).json({
+                message: "Failed to update product stock",
+                error: stockError instanceof Error ? stockError.message : String(stockError),
+            });
+        }
+        const processedItems = items.map((item) => ({
+            product: item.product,
+            quantity: item.quantity,
+            price: item.price,
+            size: item.size || undefined,
+            color: item.color || undefined,
+        }));
         const newOrder = new Order_1.Order({
             user: userId,
-            items: items,
+            items: processedItems,
             shippingAddress: shippingAddress,
             paymentMethod: paymentMethod,
             totalAmount: totalAmount,
+            utrNumber: utrNumber,
             status: "pending",
         });
-        console.log("OrderController - Order object created:", newOrder);
         await newOrder.save();
-        console.log("OrderController - Order saved successfully");
         res.json({
             message: "Order created successfully",
             order: newOrder,
@@ -132,8 +190,10 @@ const cancelOrder = async (req, res) => {
         if (order.user.toString() !== userId) {
             return res.status(403).json({ message: "Access denied" });
         }
-        if (!["pending", "shipped"].includes(order.status)) {
-            return res.status(400).json({ message: "Order cannot be cancelled" });
+        if (!["pending", "confirmed", "shipped"].includes(order.status)) {
+            return res.status(400).json({
+                message: `Order cannot be cancelled. Current status: ${order.status}. Only pending, confirmed, or shipped orders can be cancelled.`,
+            });
         }
         order.status = "cancelled";
         await order.save();
@@ -175,9 +235,7 @@ const returnReplaceOrder = async (req, res) => {
     }
     catch (error) {
         console.error("Error processing return/replace:", error);
-        res
-            .status(500)
-            .json({
+        res.status(500).json({
             message: "Error processing return/replace",
             error: error.message,
         });

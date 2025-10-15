@@ -1,14 +1,13 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-// Hidden Products Document Interface
-export interface HiddenProductsDocument extends Document {
+export interface IHiddenProducts extends Document {
   productNames: string[];
+  updatedBy: string;
+  createdAt: Date;
   updatedAt: Date;
-  updatedBy: string; // Admin ID who updated the list
 }
 
-// Hidden Products Schema
-const HiddenProductsSchema = new Schema<HiddenProductsDocument>(
+const HiddenProductsSchema = new Schema<IHiddenProducts>(
   {
     productNames: {
       type: [String],
@@ -25,12 +24,9 @@ const HiddenProductsSchema = new Schema<HiddenProductsDocument>(
   }
 );
 
-// Create a singleton document - only one hidden products list
 HiddenProductsSchema.index({}, { unique: true });
 
-const HiddenProducts = mongoose.model<HiddenProductsDocument>(
+export default mongoose.model<IHiddenProducts>(
   "HiddenProducts",
   HiddenProductsSchema
 );
-
-export default HiddenProducts;

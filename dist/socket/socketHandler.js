@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SocketHandler = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const Chat_1 = require("../models/Chat");
+const Ticket_1 = __importDefault(require("../models/Ticket"));
+const Message_1 = __importDefault(require("../models/Message"));
 const User_1 = __importDefault(require("../models/User"));
 const Admin_1 = __importDefault(require("../models/Admin"));
 class SocketHandler {
@@ -20,11 +22,9 @@ class SocketHandler {
             const token = socket.handshake.auth.token ||
                 socket.handshake.headers.authorization?.replace("Bearer ", "");
             if (!token) {
-                console.log("Socket authentication failed: No token provided");
                 return null;
             }
             const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET || "your-secret-key-here");
-            console.log("Socket authentication - Decoded token:", {
                 id: decoded.id,
                 role: decoded.role,
                 username: decoded.username,
@@ -59,7 +59,6 @@ class SocketHandler {
     }
     setupSocketHandlers() {
         this.io.on("connection", async (socket) => {
-            console.log("New socket connection:", socket.id);
             const auth = await this.authenticateSocket(socket);
             if (!auth) {
                 socket.emit("auth_error", { message: "Authentication failed" });
@@ -68,18 +67,25 @@ class SocketHandler {
             }
             this.connectedUsers.set(socket.id, auth);
             this.userSockets.set(auth.userId, socket.id);
-            console.log(`User ${auth.username} (${auth.userType}) connected with socket ${socket.id}`);
             socket.join(`user_${auth.userId}`);
             if (auth.userType === "admin") {
                 socket.join("admin_room");
+                socket.join("support_admin_room");
+            }
+            if (auth.userType === "user") {
+                socket.join("support_user_room");
             }
             socket.on("join_chat", (chatId) => {
                 socket.join(`chat_${chatId}`);
-                console.log(`User ${auth.username} joined chat ${chatId}`);
+            });
+            socket.on("join_support_ticket", (ticketId) => {
+                socket.join(`ticket_${ticketId}`);
             });
             socket.on("leave_chat", (chatId) => {
                 socket.leave(`chat_${chatId}`);
-                console.log(`User ${auth.username} left chat ${chatId}`);
+            });
+            socket.on("leave_support_ticket", (ticketId) => {
+                socket.leave(`ticket_${ticketId}`);
             });
             socket.on("send_message", async (data) => {
                 try {
@@ -139,11 +145,67 @@ class SocketHandler {
                             adminUsername: auth.username,
                         });
                     }
-                    console.log(`Message sent in chat ${chatId} by ${auth.username}`);
                 }
                 catch (error) {
                     console.error("Error sending message:", error);
                     socket.emit("error", { message: "Failed to send message" });
+                }
+            });
+            socket.on("send_support_message", async (data) => {
+                try {
+                    const { ticketId, message, messageType = "text" } = data;
+                    const ticket = await Ticket_1.default.findById(ticketId);
+                    if (!ticket) {
+                        socket.emit("error", { message: "Ticket not found" });
+                        return;
+                    }
+                    const hasAccess = auth.userType === "admin" ||
+                        ticket.userId.toString() === auth.userId;
+                    if (!hasAccess) {
+                        socket.emit("error", { message: "Access denied" });
+                        return;
+                    }
+                    const messageData = {
+                        ticketId,
+                        sender: auth.userType,
+                        senderId: auth.userId,
+                        message,
+                        messageType,
+                    };
+                    const newMessage = new Message_1.default(messageData);
+                    await newMessage.save();
+                    ticket.lastMessageAt = new Date();
+                    await ticket.save();
+                    await newMessage.populate([
+                        { path: "senderId", select: "username email" },
+                    ]);
+                    this.io.to(`ticket_${ticketId}`).emit("new_support_message", {
+                        message: newMessage,
+                        ticketId,
+                    });
+                    if (auth.userType === "user") {
+                        this.io
+                            .to("support_admin_room")
+                            .emit("new_user_support_message", {
+                            ticketId,
+                            message: newMessage,
+                            userId: auth.userId,
+                            username: auth.username,
+                        });
+                    }
+                    else {
+                        this.io
+                            .to(`user_${ticket.userId}`)
+                            .emit("new_admin_support_message", {
+                            ticketId,
+                            message: newMessage,
+                            adminUsername: auth.username,
+                        });
+                    }
+                }
+                catch (error) {
+                    console.error("Error sending support message:", error);
+                    socket.emit("error", { message: "Failed to send support message" });
                 }
             });
             socket.on("typing_start", (chatId) => {
@@ -155,6 +217,20 @@ class SocketHandler {
             });
             socket.on("typing_stop", (chatId) => {
                 socket.to(`chat_${chatId}`).emit("user_stopped_typing", {
+                    userId: auth.userId,
+                    username: auth.username,
+                    userType: auth.userType,
+                });
+            });
+            socket.on("support_typing_start", (ticketId) => {
+                socket.to(`ticket_${ticketId}`).emit("support_user_typing", {
+                    userId: auth.userId,
+                    username: auth.username,
+                    userType: auth.userType,
+                });
+            });
+            socket.on("support_typing_stop", (ticketId) => {
+                socket.to(`ticket_${ticketId}`).emit("support_user_stopped_typing", {
                     userId: auth.userId,
                     username: auth.username,
                     userType: auth.userType,
@@ -178,6 +254,26 @@ class SocketHandler {
                 }
                 catch (error) {
                     console.error("Error marking messages as read:", error);
+                }
+            });
+            socket.on("mark_support_messages_read", async (ticketId) => {
+                try {
+                    const oppositeSender = auth.userType === "user" ? "admin" : "user";
+                    await Message_1.default.updateMany({
+                        ticketId,
+                        sender: oppositeSender,
+                        seen: false,
+                    }, {
+                        seen: true,
+                    });
+                    socket.to(`ticket_${ticketId}`).emit("support_messages_read", {
+                        userId: auth.userId,
+                        username: auth.username,
+                        userType: auth.userType,
+                    });
+                }
+                catch (error) {
+                    console.error("Error marking support messages as read:", error);
                 }
             });
             socket.on("update_chat_status", async (data) => {
@@ -210,15 +306,80 @@ class SocketHandler {
                         status: chat.status,
                         priority: chat.priority,
                     });
-                    console.log(`Chat ${chatId} status updated by admin ${auth.username}`);
                 }
                 catch (error) {
                     console.error("Error updating chat status:", error);
                     socket.emit("error", { message: "Failed to update chat status" });
                 }
             });
+            socket.on("update_support_ticket_status", async (data) => {
+                if (auth.userType !== "admin") {
+                    socket.emit("error", { message: "Access denied" });
+                    return;
+                }
+                try {
+                    const { ticketId, status, priority, assignedAdmin } = data;
+                    const ticket = await Ticket_1.default.findById(ticketId);
+                    if (!ticket) {
+                        socket.emit("error", { message: "Ticket not found" });
+                        return;
+                    }
+                    if (status)
+                        ticket.status = status;
+                    if (priority)
+                        ticket.priority = priority;
+                    if (assignedAdmin)
+                        ticket.assignedAdmin = assignedAdmin;
+                    await ticket.save();
+                    this.io
+                        .to(`ticket_${ticketId}`)
+                        .emit("support_ticket_status_updated", {
+                        ticketId,
+                        status: ticket.status,
+                        priority: ticket.priority,
+                        assignedAdmin: ticket.assignedAdmin,
+                    });
+                    this.io
+                        .to(`user_${ticket.userId}`)
+                        .emit("support_ticket_status_changed", {
+                        ticketId,
+                        status: ticket.status,
+                        priority: ticket.priority,
+                    });
+                    if (status === "closed") {
+                        const feedbackMessage = new Message_1.default({
+                            ticketId,
+                            sender: "admin",
+                            message: "💬 Please rate your chat experience (1–5 stars) and add a short comment.",
+                            messageType: "auto-reply",
+                        });
+                        await feedbackMessage.save();
+                        this.io.to(`ticket_${ticketId}`).emit("new_support_message", {
+                            message: feedbackMessage,
+                            ticketId,
+                        });
+                    }
+                }
+                catch (error) {
+                    console.error("Error updating support ticket status:", error);
+                    socket.emit("error", { message: "Failed to update ticket status" });
+                }
+            });
+            socket.on("user_closed_ticket", async (data) => {
+                socket.to("support_admin_room").emit("user_closed_ticket", {
+                    ticketId: data.ticketId,
+                    userId: data.userId,
+                    message: data.message,
+                    closedBy: auth.username,
+                });
+            });
+            socket.on("test_connection", (data) => {
+                socket.emit("test_connection_response", {
+                    received: true,
+                    timestamp: new Date(),
+                });
+            });
             socket.on("disconnect", () => {
-                console.log(`User ${auth.username} disconnected`);
                 this.connectedUsers.delete(socket.id);
                 this.userSockets.delete(auth.userId);
             });

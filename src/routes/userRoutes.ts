@@ -3,6 +3,7 @@ import {
   getUserProfile,
   updateUserProfile,
   updateUserProfileImage,
+  removeUserProfileImage,
 } from "../controllers/userController";
 import { authMiddleware } from "../middleware/authMiddleware";
 
@@ -19,5 +20,8 @@ router.put("/profile", updateUserProfile);
 
 // Update user profile image
 router.put("/profile/image", updateUserProfileImage);
+
+// Remove user profile image
+router.delete("/profile/image", removeUserProfileImage);
 
 export default router;

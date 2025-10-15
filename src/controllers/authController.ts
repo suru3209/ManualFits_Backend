@@ -38,11 +38,9 @@ export const signup = async (req: Request, res: Response) => {
         subject: "Verify Your Email - Manualfits",
         html: emailHtml,
       });
-      console.log(`✅ Email sent successfully to ${email}`);
     } catch (emailError) {
       console.error("Failed to send verification email:", emailError);
       // For development: Log OTP to console
-      console.log(`🔑 DEVELOPMENT OTP for ${email}: ${otp}`);
       console.log(
         "⚠️  Email sending failed, but OTP is logged above for testing"
       );
@@ -87,7 +85,12 @@ export const login = async (req: Request, res: Response) => {
 
     // Generate JWT
     const token = jwt.sign(
-      { id: user._id, email: user.email },
+      {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        role: "user",
+      },
       process.env.JWT_SECRET as string,
       { expiresIn: "7d" }
     );
@@ -112,7 +115,7 @@ export const verifySignupOTP = async (req: Request, res: Response) => {
     const { email, otp, username, password } = req.body;
 
     // Debug: Log received data
-    console.log("🔍 Received OTP verification request:", {
+    console.log("🔍 OTP Verification - Received data:", {
       email,
       otp,
       username,
@@ -121,7 +124,7 @@ export const verifySignupOTP = async (req: Request, res: Response) => {
 
     // Validate input
     if (!email || !otp || !username || !password) {
-      console.log("❌ Missing required fields:", {
+      console.log("❌ OTP Verification - Missing required fields:", {
         email: !!email,
         otp: !!otp,
         username: !!username,
@@ -159,7 +162,12 @@ export const verifySignupOTP = async (req: Request, res: Response) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: newUser._id, email: newUser.email },
+      {
+        id: newUser._id,
+        email: newUser.email,
+        username: newUser.username,
+        role: "user",
+      },
       process.env.JWT_SECRET as string,
       { expiresIn: "7d" }
     );
@@ -285,11 +293,9 @@ export const resendOTP = async (req: Request, res: Response) => {
         subject: "New Verification Code - Manualfits",
         html: emailHtml,
       });
-      console.log(`✅ Resend OTP email sent successfully to ${email}`);
     } catch (emailError) {
       console.error("Failed to send verification email:", emailError);
       // For development: Log OTP to console
-      console.log(`🔑 DEVELOPMENT OTP for ${email}: ${otp}`);
       console.log(
         "⚠️  Email sending failed, but OTP is logged above for testing"
       );
@@ -353,11 +359,9 @@ export const sendSignupOTP = async (req: Request, res: Response) => {
         subject: "Verify Your Email - Manualfits",
         html: emailHtml,
       });
-      console.log(`✅ Email sent successfully to ${email}`);
     } catch (emailError) {
       console.error("Failed to send verification email:", emailError);
       // For development: Log OTP to console
-      console.log(`🔑 DEVELOPMENT OTP for ${email}: ${otp}`);
       console.log(
         "⚠️  Email sending failed, but OTP is logged above for testing"
       );
@@ -468,7 +472,12 @@ export const completeSignup = async (req: Request, res: Response) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: user._id, email: user.email },
+      {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        role: "user",
+      },
       process.env.JWT_SECRET as string,
       { expiresIn: "7d" }
     );

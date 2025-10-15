@@ -79,6 +79,7 @@ const UserSchema = new mongoose_1.Schema({
     dob: { type: Date },
     gender: { type: String, enum: ["Male", "Female", "Other"] },
     isEmailVerified: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
     otp: { type: String },
     otpExpiresAt: { type: Date },
     otpVerified: { type: Boolean },

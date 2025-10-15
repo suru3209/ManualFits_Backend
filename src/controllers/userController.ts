@@ -9,7 +9,6 @@ import {
 export const getUserProfile = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    console.log("UserController - Getting profile for user:", userId);
 
     const user = await User.findById(userId);
     if (!user) {
@@ -27,11 +26,10 @@ export const getUserProfile = async (req: Request, res: Response) => {
       dob: user.dob,
       gender: user.gender,
       addresses: user.addresses,
+      saved_payments: user.saved_payments,
       created_at: user.created_at,
       updated_at: user.updated_at,
     };
-
-    console.log("UserController - User profile:", userData);
 
     res.json({
       message: "User profile retrieved successfully",
@@ -50,16 +48,6 @@ export const updateUserProfile = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const { username, email, phone, image, dob, gender } = req.body;
-
-    console.log("UserController - Updating profile for user:", userId);
-    console.log("UserController - Update data:", {
-      username,
-      email,
-      phone,
-      image,
-      dob,
-      gender,
-    });
 
     const user = await User.findById(userId);
     if (!user) {
@@ -90,8 +78,6 @@ export const updateUserProfile = async (req: Request, res: Response) => {
       updated_at: user.updated_at,
     };
 
-    console.log("UserController - Updated user profile:", userData);
-
     res.json({
       message: "User profile updated successfully",
       user: userData,
@@ -109,8 +95,6 @@ export const updateUserProfileImage = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const { image, cloudinaryPublicId } = req.body;
-
-    console.log("UserController - Updating profile image for user:", userId);
 
     const user = await User.findById(userId);
     if (!user) {
@@ -143,19 +127,64 @@ export const updateUserProfileImage = async (req: Request, res: Response) => {
       updated_at: user.updated_at,
     };
 
-    console.log("UserController - Updated user profile image:", userData);
-
     res.json({
       message: "User profile image updated successfully",
       user: userData,
     });
   } catch (error: any) {
     console.error("Error updating user profile image:", error);
-    res
-      .status(500)
-      .json({
-        message: "Error updating user profile image",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error updating user profile image",
+      error: error.message,
+    });
+  }
+};
+
+// Remove user profile image
+export const removeUserProfileImage = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Delete image from Cloudinary if exists
+    if (user.cloudinaryPublicId) {
+      await deleteFromCloudinary(user.cloudinaryPublicId);
+    }
+
+    // Remove image fields from user
+    user.image = "";
+    user.cloudinaryPublicId = "";
+
+    await user.save();
+
+    // Return updated user data
+    const userData = {
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      phone: user.phone,
+      image: user.image,
+      cloudinaryPublicId: user.cloudinaryPublicId,
+      dob: user.dob,
+      gender: user.gender,
+      addresses: user.addresses,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
+    };
+
+    res.json({
+      message: "User profile image removed successfully",
+      user: userData,
+    });
+  } catch (error: any) {
+    console.error("Error removing user profile image:", error);
+    res.status(500).json({
+      message: "Error removing user profile image",
+      error: error.message,
+    });
   }
 };

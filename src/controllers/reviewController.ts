@@ -30,15 +30,10 @@ export const getProductReviews = async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
 
-    console.log("🔍 Fetching reviews for product:", productId);
-
     const reviews = await Review.find({ product: productId })
       .populate("user", "username email image")
       .sort({ createdAt: -1 })
       .lean();
-
-    console.log("🔍 Found reviews:", reviews.length);
-    console.log("🔍 Raw reviews data:", JSON.stringify(reviews, null, 2));
 
     const formattedReviews = reviews.map((review: any) => {
       const userData = {
@@ -62,13 +57,6 @@ export const getProductReviews = async (req: Request, res: Response) => {
         createdAt: review.createdAt,
         updatedAt: review.updatedAt,
       };
-
-      console.log("🔍 Formatted review user data:", {
-        _id: formattedReview.user._id,
-        name: formattedReview.user.name,
-        email: formattedReview.user.email,
-        profilePic: formattedReview.user.profilePic,
-      });
 
       return formattedReview;
     });
@@ -294,13 +282,7 @@ export const checkUserCanReview = async (
     const { productId } = req.params;
     const userId = req.user?.id;
 
-    console.log("🔍 Checking review eligibility for:");
-    console.log("🔍 Product ID:", productId);
-    console.log("🔍 User ID:", userId);
-    console.log("🔍 User object:", req.user);
-
     if (!userId) {
-      console.log("🔍 No user ID found");
       return res.json({
         canReview: false,
         reason: "User not authenticated",
@@ -308,14 +290,12 @@ export const checkUserCanReview = async (
     }
 
     // Check if user has already reviewed this product
-    console.log("🔍 Checking for existing review...");
     const existingReview = await Review.findOne({
       user: userId,
       product: productId,
     });
 
     if (existingReview) {
-      console.log("🔍 User has already reviewed this product");
       return res.json({
         canReview: false,
         reason: "You have already reviewed this product",
@@ -323,16 +303,14 @@ export const checkUserCanReview = async (
     }
 
     // Check if user has purchased and received this product
-    console.log("🔍 Checking for delivered orders...");
     const order = await Order.findOne({
       user: new mongoose.Types.ObjectId(userId),
       "items.product": new mongoose.Types.ObjectId(productId),
       status: "delivered",
     });
 
-    console.log("🔍 Found order:", order ? "Yes" : "No");
     if (order) {
-      console.log("🔍 Order details:", {
+      console.log("Order found:", {
         orderId: order._id,
         status: order.status,
         itemsCount: order.items.length,
@@ -344,14 +322,12 @@ export const checkUserCanReview = async (
     }
 
     if (!order) {
-      console.log("🔍 No delivered order found for this product");
       return res.json({
         canReview: false,
         reason: "You can only review products you have purchased and received",
       });
     }
 
-    console.log("🔍 User is eligible to review");
     res.json({
       canReview: true,
     });

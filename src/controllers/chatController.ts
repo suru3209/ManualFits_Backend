@@ -3,12 +3,29 @@ import { Chat, ChatMessage } from "../models/Chat";
 import User from "../models/User";
 import { Order } from "../models/Order";
 import Admin from "../models/Admin";
+import { Types } from "mongoose";
 
-// Get all chats for a user
-export const getUserChats = async (req: Request, res: Response) => {
+interface UserRequest extends Request {
+  user?: {
+    id: string;
+    name?: string;
+    username?: string;
+    email?: string;
+  };
+}
+
+interface AdminRequest extends Request {
+  admin?: {
+    id: string;
+    username: string;
+    role: string;
+    permissions: string[];
+  };
+}
+
+export const getUserChats = async (req: UserRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-
     const chats = await Chat.find({ user: userId })
       .populate("admin", "username")
       .populate("order", "totalAmount status")
@@ -28,14 +45,11 @@ export const getUserChats = async (req: Request, res: Response) => {
   }
 };
 
-// Get all chats for admin
-export const getAdminChats = async (req: Request, res: Response) => {
+export const getAdminChats = async (req: AdminRequest, res: Response) => {
   try {
     const { status, priority, category } = req.query;
-
     const filter: any = {};
 
-    // Only filter by isActive if status is not 'closed'
     if (status && status !== "closed") {
       filter.isActive = true;
     }
@@ -48,10 +62,7 @@ export const getAdminChats = async (req: Request, res: Response) => {
       .populate("admin", "username")
       .populate("order", "totalAmount status")
       .populate("lastMessage")
-      .sort({
-        priority: 1, // urgent, high, medium, low
-        lastMessageAt: -1,
-      });
+      .sort({ lastMessageAt: -1, createdAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -66,46 +77,38 @@ export const getAdminChats = async (req: Request, res: Response) => {
   }
 };
 
-// Create a new chat
-export const createChat = async (req: Request, res: Response) => {
+export const createChat = async (req: UserRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { subject, priority, category, orderId } = req.body;
+    const { orderId, category, priority, message } = req.body;
 
-    // Check if user exists
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // Validate order reference if provided
-    if (orderId) {
-      const order = await Order.findOne({ _id: orderId, user: userId });
-      if (!order) {
-        return res.status(404).json({
-          success: false,
-          message: "Order not found or doesn't belong to user",
-        });
-      }
-    }
-
-    const chatData: any = {
+    const chat = new Chat({
       user: userId,
-      subject,
-      priority: priority || "medium",
+      order: orderId,
       category: category || "general",
-    };
+      priority: priority || "medium",
+      status: "open",
+      isActive: true,
+    });
 
-    if (orderId) {
-      chatData.order = orderId;
-      chatData.category = "order";
-    }
-
-    const chat = new Chat(chatData);
     await chat.save();
+
+    if (message) {
+      const newMessage = new ChatMessage({
+        chat: chat._id,
+        sender: new Types.ObjectId(userId),
+        senderType: "user",
+        message: message,
+        messageType: "text",
+      });
+
+      await newMessage.save();
+
+      chat.lastMessage = newMessage._id;
+      chat.lastMessageAt = newMessage.createdAt;
+      chat.messageCount += 1;
+      await chat.save();
+    }
 
     await chat.populate([
       { path: "user", select: "username email" },
@@ -125,15 +128,11 @@ export const createChat = async (req: Request, res: Response) => {
   }
 };
 
-// Get messages for a specific chat
 export const getChatMessages = async (req: Request, res: Response) => {
   try {
     const { chatId } = req.params;
-    const userId = req.user?.id || req.admin?.id;
-    const userType = req.admin ? "admin" : "user";
-
-    // Verify chat access
     const chat = await Chat.findById(chatId);
+
     if (!chat) {
       return res.status(404).json({
         success: false,
@@ -141,35 +140,11 @@ export const getChatMessages = async (req: Request, res: Response) => {
       });
     }
 
-    // Check if user has access to this chat
-    const hasAccess = userType === "admin" || chat.user.toString() === userId;
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
-    const messages = await ChatMessage.find({ chat: chatId })
-      .populate("sender", "username")
-      .sort({ createdAt: 1 });
-
-    // Mark messages as read for the current user
-    await ChatMessage.updateMany(
-      {
-        chat: chatId,
-        sender: { $ne: userId },
-        isRead: false,
-      },
-      {
-        isRead: true,
-        readAt: new Date(),
-      }
-    );
-
     res.status(200).json({
       success: true,
-      messages,
+      messages: await ChatMessage.find({ chat: chat._id }).sort({
+        createdAt: 1,
+      }),
     });
   } catch (error) {
     console.error("Error fetching chat messages:", error);
@@ -180,15 +155,12 @@ export const getChatMessages = async (req: Request, res: Response) => {
   }
 };
 
-// Send a message
 export const sendMessage = async (req: Request, res: Response) => {
   try {
     const { chatId } = req.params;
-    const { message, messageType, attachments, orderReference } = req.body;
-    const userId = req.user?.id || req.admin?.id;
-    const userType = req.admin ? "admin" : "user";
+    const { content, sender } = req.body;
+    const senderId = req.user?.id || req.admin?.id;
 
-    // Verify chat exists and user has access
     const chat = await Chat.findById(chatId);
     if (!chat) {
       return res.status(404).json({
@@ -197,53 +169,28 @@ export const sendMessage = async (req: Request, res: Response) => {
       });
     }
 
-    const hasAccess = userType === "admin" || chat.user.toString() === userId;
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
+    const newMessage = new ChatMessage({
+      chat: chat._id,
+      sender: new Types.ObjectId(senderId || ""),
+      senderType: sender === "admin" ? "admin" : "user",
+      message: content,
+      messageType: "text",
+    });
 
-    // Create message
-    const messageData: any = {
-      chat: chatId,
-      sender: userId,
-      senderType: userType === "admin" ? "admin" : "user",
-      message,
-      messageType: messageType || "text",
-    };
-
-    if (attachments) {
-      messageData.attachments = attachments;
-    }
-
-    if (orderReference) {
-      messageData.orderReference = orderReference;
-    }
-
-    const newMessage = new ChatMessage(messageData);
     await newMessage.save();
 
-    // Update chat with last message info
     chat.lastMessage = newMessage._id;
-    chat.lastMessageAt = new Date();
+    chat.lastMessageAt = newMessage.createdAt;
     chat.messageCount += 1;
 
-    // Update chat status if it was closed
-    if (chat.status === "closed" || chat.status === "resolved") {
-      chat.status = "open";
+    if (sender === "admin" && req.admin) {
+      chat.admin = new Types.ObjectId(req.admin.id);
+      chat.status = "in_progress";
     }
 
     await chat.save();
 
-    // Populate message data
-    await newMessage.populate([
-      { path: "sender", select: "username" },
-      { path: "orderReference", select: "totalAmount status" },
-    ]);
-
-    res.status(201).json({
+    res.status(200).json({
       success: true,
       message: newMessage,
     });
@@ -256,42 +203,23 @@ export const sendMessage = async (req: Request, res: Response) => {
   }
 };
 
-// Update chat status (admin only)
-export const updateChatStatus = async (req: Request, res: Response) => {
+export const updateChatStatus = async (req: AdminRequest, res: Response) => {
   try {
     const { chatId } = req.params;
-    const { status, priority, adminId } = req.body;
+    const { status } = req.body;
 
-    const chat = await Chat.findById(chatId);
+    const chat = await Chat.findByIdAndUpdate(
+      chatId,
+      { status },
+      { new: true }
+    ).populate("user", "username email");
+
     if (!chat) {
       return res.status(404).json({
         success: false,
         message: "Chat not found",
       });
     }
-
-    if (status) chat.status = status;
-    if (priority) chat.priority = priority;
-    if (adminId) {
-      // Verify admin exists
-      const admin = await Admin.findById(adminId);
-      if (!admin) {
-        return res.status(404).json({
-          success: false,
-          message: "Admin not found",
-        });
-      }
-      chat.admin = adminId;
-    }
-
-    await chat.save();
-
-    await chat.populate([
-      { path: "user", select: "username email" },
-      { path: "admin", select: "username" },
-      { path: "order", select: "totalAmount status" },
-      { path: "lastMessage" },
-    ]);
 
     res.status(200).json({
       success: true,
@@ -306,81 +234,23 @@ export const updateChatStatus = async (req: Request, res: Response) => {
   }
 };
 
-// Get chat statistics for admin dashboard
-export const getChatStats = async (req: Request, res: Response) => {
-  try {
-    const totalChats = await Chat.countDocuments({ isActive: true });
-    const openChats = await Chat.countDocuments({
-      status: "open",
-      isActive: true,
-    });
-    const inProgressChats = await Chat.countDocuments({
-      status: "in_progress",
-      isActive: true,
-    });
-    const resolvedChats = await Chat.countDocuments({
-      status: "resolved",
-      isActive: true,
-    });
-    const urgentChats = await Chat.countDocuments({
-      priority: "urgent",
-      status: { $in: ["open", "in_progress"] },
-      isActive: true,
-    });
-
-    res.status(200).json({
-      success: true,
-      stats: {
-        totalChats,
-        openChats,
-        inProgressChats,
-        resolvedChats,
-        urgentChats,
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching chat stats:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch chat statistics",
-    });
-  }
-};
-
-// Close a chat
 export const closeChat = async (req: Request, res: Response) => {
   try {
     const { chatId } = req.params;
-    const userId = req.user?.id || req.admin?.id;
-    const userType = req.admin ? "admin" : "user";
+    const chat = await Chat.findByIdAndUpdate(
+      chatId,
+      {
+        status: "closed",
+        isActive: false,
+        closedAt: new Date(),
+      },
+      { new: true }
+    );
 
-    const chat = await Chat.findById(chatId);
     if (!chat) {
       return res.status(404).json({
         success: false,
         message: "Chat not found",
-      });
-    }
-
-    const hasAccess = userType === "admin" || chat.user.toString() === userId;
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
-    chat.status = "closed";
-    chat.isActive = false;
-    await chat.save();
-
-    // Emit socket event for real-time updates
-    const io = req.app.get("io");
-    if (io) {
-      io.emit("chat_status_changed", {
-        chatId: chat._id,
-        status: "closed",
-        isActive: false,
       });
     }
 
@@ -393,6 +263,34 @@ export const closeChat = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Failed to close chat",
+    });
+  }
+};
+
+export const getChatStats = async (req: AdminRequest, res: Response) => {
+  try {
+    const [totalChats, openChats, closedChats, inProgressChats] =
+      await Promise.all([
+        Chat.countDocuments(),
+        Chat.countDocuments({ status: "open", isActive: true }),
+        Chat.countDocuments({ status: "closed" }),
+        Chat.countDocuments({ status: "in_progress", isActive: true }),
+      ]);
+
+    res.status(200).json({
+      success: true,
+      stats: {
+        totalChats,
+        openChats,
+        closedChats,
+        inProgressChats,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching chat stats:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch chat stats",
     });
   }
 };

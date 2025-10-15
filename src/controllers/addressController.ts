@@ -6,15 +6,12 @@ import mongoose from "mongoose";
 export const getAddresses = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    console.log("AddressController - Getting addresses for user:", userId);
 
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    console.log("AddressController - User addresses:", user.addresses);
-    console.log("AddressController - Addresses length:", user.addresses.length);
 
     res.json({
       message: "Addresses retrieved successfully",

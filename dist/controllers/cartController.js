@@ -9,13 +9,10 @@ const ProductModal_1 = __importDefault(require("../models/ProductModal"));
 const getCart = async (req, res) => {
     try {
         const userId = req.user.id;
-        console.log("CartController - Getting cart for user:", userId);
         const user = await User_1.default.findById(userId).populate("cart.productId");
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
-        console.log("CartController - User cart:", user.cart);
-        console.log("CartController - Cart length:", user.cart.length);
         res.json({
             message: "Cart retrieved successfully",
             cart: user.cart,
@@ -47,11 +44,20 @@ const addToCart = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
         const existingItemIndex = user.cart.findIndex((item) => item.productId.toString() === productId);
+        let newQuantity = quantity;
         if (existingItemIndex !== -1) {
-            user.cart[existingItemIndex].quantity += quantity;
+            newQuantity = user.cart[existingItemIndex].quantity + quantity;
+        }
+        if (product.totalStock < newQuantity) {
+            return res.status(400).json({
+                message: `Insufficient stock for ${product.title}. Available: ${product.totalStock}, Requested: ${newQuantity}`,
+            });
+        }
+        if (existingItemIndex !== -1) {
+            user.cart[existingItemIndex].quantity = newQuantity;
         }
         else {
-            user.cart.push({ productId, quantity });
+            user.cart.push({ productId, quantity, addedAt: new Date() });
         }
         await user.save();
         res.json({

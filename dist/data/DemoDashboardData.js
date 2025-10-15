@@ -279,7 +279,6 @@ const createDemoCartData = async (userId) => {
 exports.createDemoCartData = createDemoCartData;
 const setupDemoDashboardData = async () => {
     try {
-        console.log("🚀 Setting up demo dashboard data...");
         const demoUser = await (0, exports.createDemoUserData)();
         const demoOrders = await (0, exports.createDemoOrdersData)(demoUser._id);
         const demoWishlist = await (0, exports.createDemoWishlistData)(demoUser._id);

@@ -5,55 +5,60 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
-const Admin_1 = __importDefault(require("../models/Admin"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const Admin_1 = __importDefault(require("../models/Admin"));
 dotenv_1.default.config();
-const initAdmin = async () => {
+const createAdminUser = async () => {
     try {
-        await mongoose_1.default.connect(process.env.MONGO_URI);
-        console.log("Connected to MongoDB");
-        const existingAdmin = await Admin_1.default.findOne({ username: "suru3209" });
+        await mongoose_1.default.connect(process.env.MONGO_URI || "");
+        const existingAdmin = await Admin_1.default.findOne({ username: "admin" });
         if (existingAdmin) {
-            console.log("Admin user already exists");
             return;
         }
-        const hashedPassword = await bcrypt_1.default.hash("Sury@108", 12);
+        const hashedPassword = await bcrypt_1.default.hash("admin123", 10);
         const admin = new Admin_1.default({
-            username: "suru3209",
+            username: "admin",
+            email: "admin@manualfits.com",
             password: hashedPassword,
             role: "super_admin",
             permissions: [
-                "users.view",
-                "users.edit",
-                "users.delete",
-                "products.view",
                 "products.create",
-                "products.edit",
+                "products.read",
+                "products.update",
                 "products.delete",
-                "orders.view",
-                "orders.edit",
-                "reviews.view",
+                "orders.read",
+                "orders.update",
+                "users.read",
+                "users.update",
+                "users.delete",
+                "reviews.read",
+                "reviews.update",
                 "reviews.delete",
-                "returns.view",
-                "returns.edit",
-                "admins.view",
+                "coupons.create",
+                "coupons.read",
+                "coupons.update",
+                "coupons.delete",
+                "analytics.read",
+                "settings.read",
+                "settings.update",
                 "admins.create",
-                "admins.edit",
+                "admins.read",
+                "admins.update",
                 "admins.delete",
+                "support.view",
+                "support.create",
+                "support.update",
+                "support.delete",
             ],
             isActive: true,
         });
         await admin.save();
-        console.log("Admin user created successfully");
-        console.log("Username: suru3209");
-        console.log("Password: Sury@108");
     }
     catch (error) {
-        console.error("Error initializing admin:", error);
+        console.error("❌ Error creating admin user:", error);
     }
     finally {
-        await mongoose_1.default.disconnect();
-        console.log("Disconnected from MongoDB");
+        await mongoose_1.default.connection.close();
     }
 };
-initAdmin();
+createAdminUser();

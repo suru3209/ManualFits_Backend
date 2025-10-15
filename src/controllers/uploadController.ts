@@ -25,7 +25,7 @@ const upload = multer({
 // Single image upload
 export const uploadSingle = async (req: Request, res: Response) => {
   try {
-    console.log("Upload controller - Request received:", {
+    console.log("Upload single - Request details:", {
       hasFile: !!req.file,
       fileSize: req.file?.size,
       fileType: req.file?.mimetype,
@@ -33,7 +33,6 @@ export const uploadSingle = async (req: Request, res: Response) => {
     });
 
     if (!req.file) {
-      console.log("Upload controller - No file provided");
       return res.status(400).json({
         success: false,
         message: "No image file provided",
@@ -42,15 +41,13 @@ export const uploadSingle = async (req: Request, res: Response) => {
 
     // Validate file
     if (!req.file.mimetype.startsWith("image/")) {
-      console.log("Upload controller - Invalid file type:", req.file.mimetype);
       return res.status(400).json({
         success: false,
         message: "Only image files are allowed",
       });
     }
 
-    console.log("Upload controller - Starting Cloudinary upload");
-    console.log("Upload controller - File details:", {
+    console.log("Upload single - File details:", {
       originalname: req.file.originalname,
       mimetype: req.file.mimetype,
       size: req.file.size,
@@ -58,10 +55,17 @@ export const uploadSingle = async (req: Request, res: Response) => {
     });
 
     const result = await uploadToCloudinary(req.file, "manualfits/products");
-    console.log("Upload controller - Upload result:", result);
+
+    if (!result.success) {
+      console.error("Upload controller - Detailed error:", {
+        error: result.error,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        fileType: req.file.mimetype,
+      });
+    }
 
     if (result.success) {
-      console.log("Upload controller - Upload successful:", result.public_id);
       res.status(200).json({
         success: true,
         message: "Image uploaded successfully",

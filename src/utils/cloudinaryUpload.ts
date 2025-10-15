@@ -13,13 +13,13 @@ export const uploadToCloudinary = async (
   folder: string = "manualfits"
 ): Promise<CloudinaryUploadResult> => {
   try {
-    console.log("Cloudinary config:", {
+    console.log("Starting Cloudinary upload with config:", {
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY ? "Present" : "Missing",
       api_secret: process.env.CLOUDINARY_API_SECRET ? "Present" : "Missing",
     });
 
-    console.log("Uploading file:", {
+    console.log("File details:", {
       originalname: file.originalname,
       mimetype: file.mimetype,
       size: file.size,
@@ -39,27 +39,24 @@ export const uploadToCloudinary = async (
       );
     }
 
-    console.log("File size check passed:", {
+    console.log("File size validation:", {
       size: file.buffer.length,
       maxSize: maxSize,
       sizeMB: (file.buffer.length / (1024 * 1024)).toFixed(2),
     });
 
     // Use direct upload method (more reliable than stream)
-    console.log("Starting direct upload to Cloudinary...");
 
     // Convert buffer to base64 with error handling
     let base64Data: string;
     try {
       base64Data = file.buffer.toString("base64");
-      console.log("Base64 conversion successful, length:", base64Data.length);
     } catch (base64Error) {
       console.error("Base64 conversion failed:", base64Error);
       throw new Error("Failed to convert file to base64");
     }
 
     const dataUrl = `data:${file.mimetype};base64,${base64Data}`;
-    console.log("Data URL created, length:", dataUrl.length);
 
     const result = await cloudinary.uploader.upload(dataUrl, {
       folder: folder,

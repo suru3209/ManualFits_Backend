@@ -10,7 +10,6 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const corsMiddleware_1 = require("./middleware/corsMiddleware");
 const ProductModal_1 = __importDefault(require("./models/ProductModal"));
-const HiddenProducts_1 = __importDefault(require("./models/HiddenProducts"));
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const cartRoutes_1 = __importDefault(require("./routes/cartRoutes"));
 const wishlistRoutes_1 = __importDefault(require("./routes/wishlistRoutes"));
@@ -22,11 +21,16 @@ const uploadRoutes_1 = __importDefault(require("./routes/uploadRoutes"));
 const reviewRoutes_1 = __importDefault(require("./routes/reviewRoutes"));
 const adminRoutes_1 = __importDefault(require("./routes/adminRoutes"));
 const chatRoutes_1 = __importDefault(require("./routes/chatRoutes"));
+const supportRoutes_1 = __importDefault(require("./routes/supportRoutes"));
+const couponRoutes_1 = __importDefault(require("./routes/couponRoutes"));
+const settingsRoutes_1 = __importDefault(require("./routes/settingsRoutes"));
+const productVariantRoutes_1 = __importDefault(require("./routes/productVariantRoutes"));
 const socketHandler_1 = require("./socket/socketHandler");
+const autoReplyService_1 = require("./utils/autoReplyService");
+const supportController_1 = require("./controllers/supportController");
 dotenv_1.default.config();
 if (!process.env.JWT_SECRET) {
     process.env.JWT_SECRET = "your-secret-key-here";
-    console.log("⚠️  JWT_SECRET not found, using default. Please set JWT_SECRET in .env file");
 }
 const app = (0, express_1.default)();
 const server = (0, http_1.createServer)(app);
@@ -47,6 +51,7 @@ const io = new socket_io_1.Server(server, {
     },
 });
 const socketHandler = new socketHandler_1.SocketHandler(io);
+(0, supportController_1.setSocketInstance)(io);
 app.use(corsMiddleware_1.requestLogger);
 app.use(corsMiddleware_1.simpleCors);
 app.use(corsMiddleware_1.securityHeaders);
@@ -62,7 +67,11 @@ app.use("/api/user", paymentRoutes_1.default);
 app.use("/api/upload", uploadRoutes_1.default);
 app.use("/api/reviews", reviewRoutes_1.default);
 app.use("/api/admin", adminRoutes_1.default);
+app.use("/api/admin/coupons", couponRoutes_1.default);
+app.use("/api/admin/settings", settingsRoutes_1.default);
 app.use("/api/chat", chatRoutes_1.default);
+app.use("/api/support", supportRoutes_1.default);
+app.use("/api/products", productVariantRoutes_1.default);
 mongoose_1.default
     .connect(process.env.MONGO_URI || "", {
     serverSelectionTimeoutMS: 30000,
@@ -73,35 +82,32 @@ mongoose_1.default
     maxIdleTimeMS: 30000,
 })
     .then(() => {
-    console.log("✅ MongoDB Connected successfully");
-    console.log("📊 Database state:", mongoose_1.default.connection.readyState);
 })
     .catch((err) => {
     console.error("❌ MongoDB Connection Error:", err);
-    console.log("🔍 Connection string:", process.env.MONGO_URI ? "Present" : "Missing");
 });
 mongoose_1.default.connection.on("connected", () => {
-    console.log("🔗 Mongoose connected to MongoDB Atlas");
 });
 mongoose_1.default.connection.on("error", (err) => {
     console.error("❌ Mongoose connection error:", err);
 });
 mongoose_1.default.connection.on("disconnected", () => {
-    console.log("🔌 Mongoose disconnected from MongoDB Atlas");
 });
 process.on("SIGINT", async () => {
     await mongoose_1.default.connection.close();
-    console.log("🔌 MongoDB connection closed through app termination");
     process.exit(0);
 });
 app.get("/products", async (req, res) => {
     try {
-        const hiddenProductsDoc = await HiddenProducts_1.default.findOne();
-        const hiddenProductNames = hiddenProductsDoc?.productNames || [];
-        const products = await ProductModal_1.default.find({
-            name: { $nin: hiddenProductNames },
-        });
-        console.log(`✅ Found ${products.length} products (${hiddenProductNames.length} hidden)`);
+        const { admin } = req.query;
+        let query = {};
+        if (admin !== "true") {
+            query = {
+                status: "active",
+                inStock: true,
+            };
+        }
+        const products = await ProductModal_1.default.find(query).sort({ createdAt: -1 });
         res.status(200).json({
             message: "Products fetched successfully",
             count: products.length,
@@ -119,17 +125,21 @@ app.get("/products", async (req, res) => {
 app.get("/products/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const hiddenProductsDoc = await HiddenProducts_1.default.findOne();
-        const hiddenProductNames = hiddenProductsDoc?.productNames || [];
-        const product = await ProductModal_1.default.findById(id);
+        const { admin } = req.query;
+        let query = { _id: id };
+        if (admin !== "true") {
+            query = {
+                _id: id,
+                status: "active",
+                inStock: true,
+            };
+        }
+        const product = await ProductModal_1.default.findOne(query);
         if (!product) {
             return res.status(404).json({
-                message: "Product not found",
-            });
-        }
-        if (hiddenProductNames.includes(product.name)) {
-            return res.status(404).json({
-                message: "Product not found",
+                message: admin === "true"
+                    ? "Product not found"
+                    : "Product not found or not available",
             });
         }
         res.status(200).json({
@@ -236,6 +246,5 @@ app.post("/test-upload", async (req, res) => {
 });
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`🔌 Socket.io server initialized`);
+    autoReplyService_1.AutoReplyService.startLateResponseChecker();
 });

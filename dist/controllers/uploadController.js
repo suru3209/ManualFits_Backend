@@ -23,37 +23,38 @@ const upload = (0, multer_1.default)({
 });
 const uploadSingle = async (req, res) => {
     try {
-        console.log("Upload controller - Request received:", {
             hasFile: !!req.file,
             fileSize: req.file?.size,
             fileType: req.file?.mimetype,
             fileName: req.file?.originalname,
         });
         if (!req.file) {
-            console.log("Upload controller - No file provided");
             return res.status(400).json({
                 success: false,
                 message: "No image file provided",
             });
         }
         if (!req.file.mimetype.startsWith("image/")) {
-            console.log("Upload controller - Invalid file type:", req.file.mimetype);
             return res.status(400).json({
                 success: false,
                 message: "Only image files are allowed",
             });
         }
-        console.log("Upload controller - Starting Cloudinary upload");
-        console.log("Upload controller - File details:", {
             originalname: req.file.originalname,
             mimetype: req.file.mimetype,
             size: req.file.size,
             bufferLength: req.file.buffer.length,
         });
         const result = await (0, cloudinaryUpload_1.uploadToCloudinary)(req.file, "manualfits/products");
-        console.log("Upload controller - Upload result:", result);
+        if (!result.success) {
+            console.error("Upload controller - Detailed error:", {
+                error: result.error,
+                fileName: req.file.originalname,
+                fileSize: req.file.size,
+                fileType: req.file.mimetype,
+            });
+        }
         if (result.success) {
-            console.log("Upload controller - Upload successful:", result.public_id);
             res.status(200).json({
                 success: true,
                 message: "Image uploaded successfully",

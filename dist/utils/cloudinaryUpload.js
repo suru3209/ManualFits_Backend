@@ -7,12 +7,10 @@ exports.uploadMultipleToCloudinary = exports.deleteFromCloudinary = exports.uplo
 const cloudinary_1 = __importDefault(require("../config/cloudinary"));
 const uploadToCloudinary = async (file, folder = "manualfits") => {
     try {
-        console.log("Cloudinary config:", {
             cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
             api_key: process.env.CLOUDINARY_API_KEY ? "Present" : "Missing",
             api_secret: process.env.CLOUDINARY_API_SECRET ? "Present" : "Missing",
         });
-        console.log("Uploading file:", {
             originalname: file.originalname,
             mimetype: file.mimetype,
             size: file.size,
@@ -25,23 +23,19 @@ const uploadToCloudinary = async (file, folder = "manualfits") => {
         if (file.buffer.length > maxSize) {
             throw new Error(`File too large. Maximum size is ${maxSize / (1024 * 1024)}MB`);
         }
-        console.log("File size check passed:", {
             size: file.buffer.length,
             maxSize: maxSize,
             sizeMB: (file.buffer.length / (1024 * 1024)).toFixed(2),
         });
-        console.log("Starting direct upload to Cloudinary...");
         let base64Data;
         try {
             base64Data = file.buffer.toString("base64");
-            console.log("Base64 conversion successful, length:", base64Data.length);
         }
         catch (base64Error) {
             console.error("Base64 conversion failed:", base64Error);
             throw new Error("Failed to convert file to base64");
         }
         const dataUrl = `data:${file.mimetype};base64,${base64Data}`;
-        console.log("Data URL created, length:", dataUrl.length);
         const result = await cloudinary_1.default.uploader.upload(dataUrl, {
             folder: folder,
             resource_type: "auto",
@@ -51,7 +45,6 @@ const uploadToCloudinary = async (file, folder = "manualfits") => {
             ],
             timeout: 60000,
         });
-        console.log("Upload successful:", {
             public_id: result.public_id,
             url: result.secure_url,
         });

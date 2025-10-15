@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import * as jwt from "jsonwebtoken";
 
 export const authMiddleware = (req: any, res: Response, next: NextFunction) => {
   const token = req.headers.authorization?.split(" ")[1]; // Bearer <token>

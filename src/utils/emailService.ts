@@ -6,9 +6,6 @@ const createTransporter = () => {
   if (process.env.NODE_ENV === "development") {
     return {
       sendMail: async (mailOptions: any) => {
-        console.log("📧 DEVELOPMENT MODE - Email would be sent:");
-        console.log("To:", mailOptions.to);
-        console.log("Subject:", mailOptions.subject);
         console.log(
           "HTML Content:",
           mailOptions.html.substring(0, 100) + "..."
@@ -52,7 +49,6 @@ const createTransporter = () => {
         });
 
         const result = await sesClient.send(command);
-        console.log("Email sent successfully:", result.MessageId);
         return { messageId: result.MessageId };
       },
     };
@@ -82,7 +78,6 @@ export const sendEmail = async (options: EmailOptions): Promise<void> => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`Email sent successfully to ${options.to}`);
   } catch (error) {
     console.error("Error sending email:", error);
     throw new Error("Failed to send email");

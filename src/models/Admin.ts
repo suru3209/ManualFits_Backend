@@ -1,13 +1,24 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export interface QRCodeDetails {
+  imageUrl: string;
+  upiId: string;
+  upiName: string;
+}
+
+export interface PaymentSettings {
+  qrCodes: QRCodeDetails[];
+}
+
 export interface IAdmin extends Document {
   username: string;
   email?: string;
   password: string;
-  role: "super_admin" | "admin" | "moderator";
+  role: "super_admin" | "admin" | "moderator" | "viewer";
   permissions: string[];
   lastLogin?: Date;
   isActive: boolean;
+  paymentSettings?: PaymentSettings;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,53 +45,64 @@ const AdminSchema = new Schema<IAdmin>(
     password: {
       type: String,
       required: true,
-      minlength: 8,
+      minlength: 6,
     },
     role: {
       type: String,
-      enum: ["super_admin", "admin", "moderator"],
+      enum: ["super_admin", "admin", "moderator", "viewer"],
       default: "admin",
     },
     permissions: [
       {
         type: String,
         enum: [
-          // Users permissions
-          "users.view",
-          "users.edit",
-          "users.delete",
-          // Products permissions
-          "products.view",
           "products.create",
-          "products.edit",
+          "products.read",
+          "products.update",
           "products.delete",
-          // Orders permissions
-          "orders.view",
-          "orders.edit",
-          // Reviews permissions
-          "reviews.view",
+          "orders.read",
+          "orders.update",
+          "users.read",
+          "users.update",
+          "users.delete",
+          "reviews.read",
+          "reviews.update",
           "reviews.delete",
-          // Returns permissions
-          "returns.view",
-          "returns.edit",
-          // Admin permissions
-          "admins.view",
+          "coupons.create",
+          "coupons.read",
+          "coupons.update",
+          "coupons.delete",
+          "analytics.read",
+          "settings.read",
+          "settings.update",
           "admins.create",
-          "admins.edit",
+          "admins.read",
+          "admins.update",
           "admins.delete",
+          "support.view",
+          "support.create",
+          "support.update",
+          "support.delete",
+          "*",
         ],
       },
     ],
     lastLogin: { type: Date },
     isActive: { type: Boolean, default: true },
+    paymentSettings: {
+      qrCodes: [
+        {
+          imageUrl: { type: String, required: true },
+          upiId: { type: String, required: true },
+          upiName: { type: String, required: true },
+        },
+      ],
+    },
   },
   { timestamps: true }
 );
 
-// Index for efficient queries
 AdminSchema.index({ isActive: 1 });
 
-const Admin =
-  mongoose.models.Admin || mongoose.model<IAdmin>("Admin", AdminSchema);
-
-export default Admin;
+export default mongoose.models.Admin ||
+  mongoose.model<IAdmin>("Admin", AdminSchema);

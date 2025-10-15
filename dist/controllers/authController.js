@@ -27,12 +27,9 @@ const signup = async (req, res) => {
                 subject: "Verify Your Email - Manualfits",
                 html: emailHtml,
             });
-            console.log(`✅ Email sent successfully to ${email}`);
         }
         catch (emailError) {
             console.error("Failed to send verification email:", emailError);
-            console.log(`🔑 DEVELOPMENT OTP for ${email}: ${otp}`);
-            console.log("⚠️  Email sending failed, but OTP is logged above for testing");
         }
         res.status(200).json({
             message: "OTP sent to your email. Please verify to complete signup.",
@@ -80,14 +77,12 @@ exports.login = login;
 const verifySignupOTP = async (req, res) => {
     try {
         const { email, otp, username, password } = req.body;
-        console.log("🔍 Received OTP verification request:", {
             email,
             otp,
             username,
             password: password ? "***" : "undefined",
         });
         if (!email || !otp || !username || !password) {
-            console.log("❌ Missing required fields:", {
                 email: !!email,
                 otp: !!otp,
                 username: !!username,
@@ -208,12 +203,9 @@ const resendOTP = async (req, res) => {
                 subject: "New Verification Code - Manualfits",
                 html: emailHtml,
             });
-            console.log(`✅ Resend OTP email sent successfully to ${email}`);
         }
         catch (emailError) {
             console.error("Failed to send verification email:", emailError);
-            console.log(`🔑 DEVELOPMENT OTP for ${email}: ${otp}`);
-            console.log("⚠️  Email sending failed, but OTP is logged above for testing");
         }
         res.json({
             message: "New verification OTP sent to your email",
@@ -263,12 +255,9 @@ const sendSignupOTP = async (req, res) => {
                 subject: "Verify Your Email - Manualfits",
                 html: emailHtml,
             });
-            console.log(`✅ Email sent successfully to ${email}`);
         }
         catch (emailError) {
             console.error("Failed to send verification email:", emailError);
-            console.log(`🔑 DEVELOPMENT OTP for ${email}: ${otp}`);
-            console.log("⚠️  Email sending failed, but OTP is logged above for testing");
         }
         res.status(200).json({
             message: "OTP sent to your email. Please verify to continue.",

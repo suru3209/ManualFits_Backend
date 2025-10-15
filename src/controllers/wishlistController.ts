@@ -6,15 +6,12 @@ import Product from "../models/ProductModal";
 export const getWishlist = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    console.log("WishlistController - Getting wishlist for user:", userId);
 
     const user = await User.findById(userId).populate("wishlist.productId");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    console.log("WishlistController - User wishlist:", user.wishlist);
-    console.log("WishlistController - Wishlist length:", user.wishlist.length);
 
     res.json({
       message: "Wishlist retrieved successfully",

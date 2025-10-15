@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express from "express";
 import {
   adminLogin,
   getDashboardStats,
@@ -6,44 +6,55 @@ import {
   getAllOrders,
   updateOrderStatus,
   getAllProducts,
+  createProduct,
+  getProduct,
+  updateProduct,
   updateProductStatus,
+  deleteProduct,
   getAllReviews,
   deleteReview,
   getReturnReplaceRequests,
   updateReturnReplaceStatus,
-  createProduct,
-  updateProduct,
-  getProduct,
-  deleteProduct,
   getAllAdmins,
   createAdmin,
   updateAdmin,
   deleteAdmin,
   getPermissions,
   updateAdminPermissions,
+  getPaymentSettings,
+  updatePaymentSettings,
+  adminImageUpload,
+  getPublicPaymentSettings,
 } from "../controllers/adminController";
 import { adminAuth } from "../middleware/adminAuthMiddleware";
 import HiddenProducts from "../models/HiddenProducts";
+import {
+  uploadSingle,
+  uploadSingleMiddleware,
+} from "../controllers/uploadController";
 
-const router = Router();
+const router = express.Router();
 
-// Admin authentication
+// Admin login (no auth required)
 router.post("/login", adminLogin);
 
-// Apply authentication middleware to all other routes
+// Public payment settings (no auth required)
+router.get("/public/payment-settings", getPublicPaymentSettings);
+
+// All other routes require admin authentication
 router.use(adminAuth);
 
 // Dashboard
 router.get("/dashboard/stats", getDashboardStats);
 
-// Users management
+// Users
 router.get("/users", getAllUsers);
 
-// Orders management
+// Orders
 router.get("/orders", getAllOrders);
 router.put("/orders/:orderId/status", updateOrderStatus);
 
-// Products management
+// Products
 router.get("/products", getAllProducts);
 router.post("/products", createProduct);
 router.get("/products/:productId", getProduct);
@@ -51,15 +62,15 @@ router.put("/products/:productId", updateProduct);
 router.put("/products/:productId/status", updateProductStatus);
 router.delete("/products/:productId", deleteProduct);
 
-// Reviews management
+// Reviews
 router.get("/reviews", getAllReviews);
 router.delete("/reviews/:reviewId", deleteReview);
 
-// Return/Replace management
+// Return/Replace
 router.get("/return-replace", getReturnReplaceRequests);
 router.put("/return-replace/:requestId/status", updateReturnReplaceStatus);
 
-// Hidden Products management
+// Hidden Products
 router.get("/hidden-products", async (req, res) => {
   try {
     const hiddenProducts = await HiddenProducts.findOne();
@@ -80,7 +91,6 @@ router.post("/hidden-products", async (req, res) => {
     const { productNames } = req.body;
     const adminId = req.admin?.id || "unknown";
 
-    // Upsert hidden products list
     const hiddenProducts = await HiddenProducts.findOneAndUpdate(
       {},
       { productNames, updatedBy: adminId },
@@ -99,12 +109,21 @@ router.post("/hidden-products", async (req, res) => {
   }
 });
 
-// Admin Management routes
+// Admin Management
 router.get("/admins", getAllAdmins);
-router.post("/create", createAdmin);
+router.post("/admins", createAdmin);
 router.put("/admins/:adminId", updateAdmin);
 router.delete("/admins/:adminId", deleteAdmin);
+
+// Permissions
 router.get("/permissions", getPermissions);
 router.put("/admins/:adminId/permissions", updateAdminPermissions);
+
+// Payment Settings
+router.get("/payment-settings", getPaymentSettings);
+router.put("/payment-settings", updatePaymentSettings);
+
+// Admin Upload
+router.post("/upload", uploadSingleMiddleware, adminImageUpload);
 
 export default router;

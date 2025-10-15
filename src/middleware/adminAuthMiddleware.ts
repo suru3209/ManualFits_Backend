@@ -1,5 +1,5 @@
+import * as jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
 import Admin from "../models/Admin";
 
 interface AdminRequest extends Request {
@@ -26,8 +26,8 @@ export const adminAuth = async (
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
-
     const admin = await Admin.findById(decoded.id);
+
     if (!admin || !admin.isActive) {
       return res.status(401).json({ message: "Admin not found or inactive" });
     }

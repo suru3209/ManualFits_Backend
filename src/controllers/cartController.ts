@@ -6,15 +6,23 @@ import Product from "../models/ProductModal";
 export const getCart = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    console.log("CartController - Getting cart for user:", userId);
 
     const user = await User.findById(userId).populate("cart.productId");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    console.log("CartController - User cart:", user.cart);
-    console.log("CartController - Cart length:", user.cart.length);
+    // Log cart items with variant details
+    user.cart.forEach((item: any, index: number) => {
+      console.log(`Cart item ${index}:`, {
+        productId: item.productId,
+        quantity: item.quantity,
+        size: item.size,
+        color: item.color,
+        addedAt: item.addedAt,
+        productTitle: item.productId?.title || item.productId?.name,
+      });
+    });
 
     res.json({
       message: "Cart retrieved successfully",
@@ -32,7 +40,15 @@ export const getCart = async (req: Request, res: Response) => {
 export const addToCart = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    const { productId, quantity } = req.body;
+    const { productId, quantity, size, color } = req.body;
+
+    console.log("Adding to cart:", {
+      userId,
+      productId,
+      quantity,
+      size,
+      color,
+    });
 
     if (!productId || !quantity) {
       return res
@@ -56,13 +72,40 @@ export const addToCart = async (req: Request, res: Response) => {
       (item: any) => item.productId.toString() === productId
     );
 
+    let newQuantity = quantity;
     if (existingItemIndex !== -1) {
-      // Update quantity
-      user.cart[existingItemIndex].quantity += quantity;
-    } else {
-      // Add new item
-      user.cart.push({ productId, quantity });
+      newQuantity = user.cart[existingItemIndex].quantity + quantity;
     }
+
+    // Check total stock availability
+    if (product.totalStock < newQuantity) {
+      return res.status(400).json({
+        message: `Insufficient stock for ${product.title}. Available: ${product.totalStock}, Requested: ${newQuantity}`,
+      });
+    }
+
+    if (existingItemIndex !== -1) {
+      // Update quantity and variant details
+      user.cart[existingItemIndex].quantity = newQuantity;
+      user.cart[existingItemIndex].size = size;
+      user.cart[existingItemIndex].color = color;
+    } else {
+      // Add new item with variant details
+      user.cart.push({
+        productId,
+        quantity,
+        size,
+        color,
+        addedAt: new Date(),
+      });
+    }
+
+    console.log("Updated cart item:", {
+      productId,
+      quantity: newQuantity,
+      size,
+      color,
+    });
 
     await user.save();
 
