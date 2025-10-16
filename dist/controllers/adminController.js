@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAdminProfile = exports.getAdminProfile = exports.getDashboardChartData = exports.getPublicPaymentSettings = exports.adminImageUpload = exports.updatePaymentSettings = exports.getPaymentSettings = exports.updateAdminPermissions = exports.getPermissions = exports.deleteAdmin = exports.updateAdmin = exports.createAdmin = exports.getAllAdmins = exports.deleteProduct = exports.getProduct = exports.updateProduct = exports.createProduct = exports.updateReturnReplaceStatus = exports.getReturnReplaceRequests = exports.deleteReview = exports.getAllReviews = exports.updateProductStatus = exports.getAllProducts = exports.updateOrderStatus = exports.getAllOrders = exports.getAllUsers = exports.getDashboardStats = exports.adminLogin = void 0;
+exports.updateAdminProfile = exports.getAdminProfile = exports.getDashboardChartData = exports.getPublicPaymentSettings = exports.adminImageUpload = exports.updatePaymentSettings = exports.getPaymentSettings = exports.updateAdminPermissions = exports.getPermissions = exports.deleteAdmin = exports.updateAdmin = exports.createAdmin = exports.getAllAdmins = exports.deleteProduct = exports.getProduct = exports.updateProduct = exports.createProduct = exports.updateReturnReplaceStatus = exports.getReturnReplaceRequests = exports.deleteReview = exports.updateReview = exports.getAllReviews = exports.updateProductStatus = exports.getAllProducts = exports.updateOrderStatus = exports.getAllOrders = exports.getAllUsers = exports.getDashboardStats = exports.adminLogin = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const Admin_1 = __importDefault(require("../models/Admin"));
@@ -397,10 +397,12 @@ const getAllReviews = async (req, res) => {
         const skip = (Number(page) - 1) * Number(limit);
         const reviews = await Review_1.default.find()
             .populate("user", "username email")
-            .populate("product", "title variants")
+            .populate("product", "title variants name")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(Number(limit));
+        console.log("🔍 Reviews fetched:", reviews.length);
+        console.log("🔍 Sample review product:", reviews[0]?.product);
         const total = await Review_1.default.countDocuments();
         res.json({
             message: "Reviews retrieved successfully",
@@ -420,6 +422,33 @@ const getAllReviews = async (req, res) => {
     }
 };
 exports.getAllReviews = getAllReviews;
+const updateReview = async (req, res) => {
+    try {
+        const { reviewId } = req.params;
+        const { status } = req.body;
+        console.log("🔍 Updating review:", reviewId, "to status:", status);
+        const review = await Review_1.default.findByIdAndUpdate(reviewId, { status }, { new: true });
+        if (!review) {
+            return res.status(404).json({ message: "Review not found" });
+        }
+        console.log("🔍 Review updated successfully:", review.status);
+        res.json({
+            message: "Review updated successfully",
+            review: {
+                _id: review._id,
+                status: review.status,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error updating review:", error);
+        res.status(500).json({
+            message: "Error updating review",
+            error: error instanceof Error ? error.message : error,
+        });
+    }
+};
+exports.updateReview = updateReview;
 const deleteReview = async (req, res) => {
     try {
         const { reviewId } = req.params;

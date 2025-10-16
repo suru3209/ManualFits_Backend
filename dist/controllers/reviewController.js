@@ -66,6 +66,14 @@ const createReview = async (req, res) => {
     try {
         const { productId, rating, title, comment, images } = req.body;
         const userId = req.user?.id;
+        console.log("🔍 Creating review with data:", {
+            productId,
+            rating,
+            title,
+            comment,
+            images: images?.length || 0,
+            userId,
+        });
         if (!userId) {
             return res.status(401).json({
                 success: false,
@@ -105,6 +113,11 @@ const createReview = async (req, res) => {
             likesCount: 0,
         });
         await review.save();
+        console.log("🔍 Review saved to database:", {
+            reviewId: review._id,
+            images: review.images,
+            imagesCount: review.images?.length || 0,
+        });
         await review.populate("user", "username email image");
         const userData = {
             _id: review.user?._id || review.user,
@@ -143,8 +156,16 @@ exports.createReview = createReview;
 const updateReview = async (req, res) => {
     try {
         const { reviewId } = req.params;
-        const { rating, title, comment } = req.body;
+        const { rating, title, comment, images } = req.body;
         const userId = req.user?.id;
+        console.log("🔍 Updating review with data:", {
+            reviewId,
+            rating,
+            title,
+            comment,
+            images: images?.length || 0,
+            userId,
+        });
         if (!userId) {
             return res.status(401).json({
                 success: false,
@@ -161,7 +182,13 @@ const updateReview = async (req, res) => {
         review.rating = rating;
         review.title = title;
         review.comment = comment;
+        review.images = images || [];
         await review.save();
+        console.log("🔍 Review updated in database:", {
+            reviewId: review._id,
+            images: review.images,
+            imagesCount: review.images?.length || 0,
+        });
         await review.populate("user", "username email image");
         const userData = {
             _id: review.user?._id || review.user,

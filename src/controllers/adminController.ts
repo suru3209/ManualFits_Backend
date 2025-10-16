@@ -467,10 +467,13 @@ export const getAllReviews = async (req: Request, res: Response) => {
 
     const reviews = await Review.find()
       .populate("user", "username email")
-      .populate("product", "title variants")
+      .populate("product", "title variants name")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
+
+    console.log("🔍 Reviews fetched:", reviews.length);
+    console.log("🔍 Sample review product:", reviews[0]?.product);
 
     const total = await Review.countDocuments();
 
@@ -486,6 +489,41 @@ export const getAllReviews = async (req: Request, res: Response) => {
   } catch (error) {
     res.status(500).json({
       message: "Error fetching reviews",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+export const updateReview = async (req: Request, res: Response) => {
+  try {
+    const { reviewId } = req.params;
+    const { status } = req.body;
+
+    console.log("🔍 Updating review:", reviewId, "to status:", status);
+
+    const review = await Review.findByIdAndUpdate(
+      reviewId,
+      { status },
+      { new: true }
+    );
+
+    if (!review) {
+      return res.status(404).json({ message: "Review not found" });
+    }
+
+    console.log("🔍 Review updated successfully:", review.status);
+
+    res.json({
+      message: "Review updated successfully",
+      review: {
+        _id: review._id,
+        status: review.status,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating review:", error);
+    res.status(500).json({
+      message: "Error updating review",
       error: error instanceof Error ? error.message : error,
     });
   }

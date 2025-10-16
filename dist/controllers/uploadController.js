@@ -87,13 +87,21 @@ const uploadSingle = async (req, res) => {
 exports.uploadSingle = uploadSingle;
 const uploadMultiple = async (req, res) => {
     try {
+        console.log("🔍 Multiple upload request:", {
+            filesCount: req.files?.length || 0,
+            hasFiles: !!req.files,
+            isArray: Array.isArray(req.files),
+        });
         if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+            console.log("❌ No files provided");
             return res.status(400).json({
                 success: false,
                 message: "No image files provided",
             });
         }
+        console.log("🔍 Uploading to Cloudinary:", req.files.length, "files");
         const results = await (0, cloudinaryUpload_1.uploadMultipleToCloudinary)(req.files, "manualfits/products");
+        console.log("🔍 Cloudinary results:", results);
         const successfulUploads = results.filter((result) => result.success);
         const failedUploads = results.filter((result) => !result.success);
         res.status(200).json({

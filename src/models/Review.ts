@@ -8,6 +8,7 @@ export interface ReviewDocument extends Document {
   title: string;
   comment: string;
   verified: boolean;
+  status: "pending" | "approved" | "rejected" | "hidden";
   likes: Types.ObjectId[]; // Users who liked this review
   likesCount: number;
   images?: string[]; // Review images
@@ -32,6 +33,11 @@ const reviewSchema = new Schema<ReviewDocument>(
     title: { type: String, required: true },
     comment: { type: String, required: true },
     verified: { type: Boolean, default: false },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected", "hidden"],
+      default: "pending",
+    },
     likes: [{ type: Schema.Types.ObjectId, ref: "User" }],
     likesCount: { type: Number, default: 0 },
     images: [{ type: String }], // Cloudinary URLs for review images

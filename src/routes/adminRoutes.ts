@@ -12,6 +12,7 @@ import {
   updateProductStatus,
   deleteProduct,
   getAllReviews,
+  updateReview,
   deleteReview,
   getReturnReplaceRequests,
   updateReturnReplaceStatus,
@@ -67,6 +68,7 @@ router.delete("/products/:productId", deleteProduct);
 
 // Reviews
 router.get("/reviews", getAllReviews);
+router.put("/reviews/:reviewId", updateReview);
 router.delete("/reviews/:reviewId", deleteReview);
 
 // Return/Replace

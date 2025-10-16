@@ -81,7 +81,16 @@ export const createReview = async (
 ) => {
   try {
     const { productId, rating, title, comment, images } = req.body;
-    const userId = req.user?.id; // Assuming user is authenticated
+    const userId = req.user?.id;
+
+    console.log("🔍 Creating review with data:", {
+      productId,
+      rating,
+      title,
+      comment,
+      images: images?.length || 0,
+      userId,
+    }); // Assuming user is authenticated
 
     if (!userId) {
       return res.status(401).json({
@@ -129,6 +138,11 @@ export const createReview = async (
     });
 
     await review.save();
+    console.log("🔍 Review saved to database:", {
+      reviewId: review._id,
+      images: review.images,
+      imagesCount: review.images?.length || 0,
+    });
 
     // Populate user data for response
     await review.populate("user", "username email image");
@@ -174,8 +188,17 @@ export const updateReview = async (
 ) => {
   try {
     const { reviewId } = req.params;
-    const { rating, title, comment } = req.body;
+    const { rating, title, comment, images } = req.body;
     const userId = req.user?.id;
+
+    console.log("🔍 Updating review with data:", {
+      reviewId,
+      rating,
+      title,
+      comment,
+      images: images?.length || 0,
+      userId,
+    });
 
     if (!userId) {
       return res.status(401).json({
@@ -195,7 +218,14 @@ export const updateReview = async (
     review.rating = rating;
     review.title = title;
     review.comment = comment;
+    review.images = images || [];
     await review.save();
+
+    console.log("🔍 Review updated in database:", {
+      reviewId: review._id,
+      images: review.images,
+      imagesCount: review.images?.length || 0,
+    });
 
     // Populate user data for response
     await review.populate("user", "username email image");

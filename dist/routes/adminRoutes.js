@@ -23,6 +23,7 @@ router.put("/products/:productId", adminController_1.updateProduct);
 router.put("/products/:productId/status", adminController_1.updateProductStatus);
 router.delete("/products/:productId", adminController_1.deleteProduct);
 router.get("/reviews", adminController_1.getAllReviews);
+router.put("/reviews/:reviewId", adminController_1.updateReview);
 router.delete("/reviews/:reviewId", adminController_1.deleteReview);
 router.get("/return-replace", adminController_1.getReturnReplaceRequests);
 router.put("/return-replace/:requestId/status", adminController_1.updateReturnReplaceStatus);
