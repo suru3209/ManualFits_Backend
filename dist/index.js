@@ -115,9 +115,13 @@ app.get("/products", async (req, res) => {
                 ],
                 $and: [
                     { isActive: { $ne: false } },
-                ]
+                ],
             };
-            const productsWithStock = await ProductModal_1.default.find({ totalStock: { $exists: true } }).limit(1).lean();
+            const productsWithStock = await ProductModal_1.default.find({
+                totalStock: { $exists: true },
+            })
+                .limit(1)
+                .lean();
             if (productsWithStock.length > 0) {
                 query.totalStock = { $gt: 0 };
             }
@@ -126,12 +130,12 @@ app.get("/products", async (req, res) => {
         if (admin !== "true") {
             console.log("🔍 Customer API Query:", JSON.stringify(query, null, 2));
             const sampleProducts = await ProductModal_1.default.find({}).limit(3).lean();
-            console.log("🔍 Sample products status:", sampleProducts.map(p => ({
+            console.log("🔍 Sample products status:", sampleProducts.map((p) => ({
                 id: p._id,
                 title: p.title,
                 status: p.status,
                 isActive: p.isActive,
-                totalStock: p.totalStock
+                totalStock: p.totalStock,
             })));
         }
         console.log(`✅ Found ${products.length} ${admin === "true" ? "total" : "active"} products`);

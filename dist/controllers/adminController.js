@@ -867,10 +867,14 @@ exports.updateAdminPermissions = updateAdminPermissions;
 const getPaymentSettings = async (req, res) => {
     try {
         const adminId = req.admin.id;
+        console.log("🔍 Fetching payment settings for admin:", adminId);
         const admin = await Admin_1.default.findById(adminId).select("paymentSettings");
         if (!admin) {
+            console.log("❌ Admin not found:", adminId);
             return res.status(404).json({ message: "Admin not found" });
         }
+        console.log("🔍 Admin payment settings:", admin.paymentSettings);
+        console.log("🔍 QR Codes count:", admin.paymentSettings?.qrCodes?.length || 0);
         res.json({
             message: "Payment settings retrieved successfully",
             paymentSettings: admin.paymentSettings || {
