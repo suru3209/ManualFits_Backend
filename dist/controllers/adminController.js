@@ -193,7 +193,7 @@ const getAllOrders = async (req, res) => {
                 .sort({ createdAt: -1 });
             const filteredOrders = allOrders.filter((order) => {
                 const searchLower = search.toLowerCase();
-                if (order._id.toString().toLowerCase().includes(searchLower))
+                if (order._id?.toString().toLowerCase().includes(searchLower))
                     return true;
                 if (order.user && typeof order.user === "object") {
                     if (order.user.username?.toLowerCase().includes(searchLower))
@@ -232,7 +232,7 @@ const getAllOrders = async (req, res) => {
                             ...item.toObject(),
                             product: {
                                 name: item.product.title,
-                                images: matchingVariant.images || item.product.images || [],
+                                images: matchingVariant.images || item.product?.images || [],
                                 price: matchingVariant.price,
                             },
                         };
@@ -259,7 +259,7 @@ const getAllOrders = async (req, res) => {
                 .populate("items.product", "title variants images");
             const filteredOrders = allOrders.filter((order) => {
                 const searchLower = search.toLowerCase();
-                if (order._id.toString().toLowerCase().includes(searchLower))
+                if (order._id?.toString().toLowerCase().includes(searchLower))
                     return true;
                 if (order.user && typeof order.user === "object") {
                     if (order.user.username?.toLowerCase().includes(searchLower))
@@ -397,7 +397,7 @@ const getAllReviews = async (req, res) => {
         const skip = (Number(page) - 1) * Number(limit);
         const reviews = await Review_1.default.find()
             .populate("user", "username email")
-            .populate("product", "title variants name")
+            .populate("product", "title variants name images")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(Number(limit));

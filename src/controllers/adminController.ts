@@ -197,7 +197,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
         const searchLower = (search as string).toLowerCase();
 
         // Check order ID
-        if (order._id.toString().toLowerCase().includes(searchLower))
+        if ((order as any)._id?.toString().toLowerCase().includes(searchLower))
           return true;
 
         // Check user info
@@ -210,7 +210,9 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
         // Check shipping address
         if (
-          order.shippingAddress?.fullName?.toLowerCase().includes(searchLower)
+          (order.shippingAddress as any)?.fullName
+            ?.toLowerCase()
+            .includes(searchLower)
         )
           return true;
 
@@ -244,19 +246,22 @@ export const getAllOrders = async (req: Request, res: Response) => {
     // Process orders to extract correct variant data
     const processedOrders = orders.map((order) => {
       const processedItems = order.items.map((item) => {
-        if (item.product && item.product.variants) {
+        if (item.product && (item.product as any).variants) {
           // Find the matching variant based on size and color
-          const matchingVariant = item.product.variants.find(
-            (variant) =>
+          const matchingVariant = (item.product as any).variants.find(
+            (variant: any) =>
               variant.size === item.size && variant.color === item.color
           );
 
           if (matchingVariant) {
             return {
-              ...item.toObject(),
+              ...(item as any).toObject(),
               product: {
-                name: item.product.title,
-                images: matchingVariant.images || item.product.images || [],
+                name: (item.product as any).title,
+                images:
+                  (matchingVariant as any).images ||
+                  (item.product as any)?.images ||
+                  [],
                 price: matchingVariant.price,
               },
             };
@@ -265,17 +270,17 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
         // Fallback if no matching variant found
         return {
-          ...item.toObject(),
+          ...(item as any).toObject(),
           product: {
-            name: item.product?.title || "Product Name Not Available",
-            images: item.product?.images || [],
+            name: (item.product as any)?.title || "Product Name Not Available",
+            images: (item.product as any)?.images || [],
             price: 0,
           },
         };
       });
 
       return {
-        ...order.toObject(),
+        ...(order as any).toObject(),
         items: processedItems,
       };
     });
@@ -291,7 +296,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
         const searchLower = (search as string).toLowerCase();
 
         // Check order ID
-        if (order._id.toString().toLowerCase().includes(searchLower))
+        if ((order as any)._id?.toString().toLowerCase().includes(searchLower))
           return true;
 
         // Check user info
@@ -304,7 +309,9 @@ export const getAllOrders = async (req: Request, res: Response) => {
 
         // Check shipping address
         if (
-          order.shippingAddress?.fullName?.toLowerCase().includes(searchLower)
+          (order.shippingAddress as any)?.fullName
+            ?.toLowerCase()
+            .includes(searchLower)
         )
           return true;
 
@@ -467,7 +474,7 @@ export const getAllReviews = async (req: Request, res: Response) => {
 
     const reviews = await Review.find()
       .populate("user", "username email")
-      .populate("product", "title variants name")
+      .populate("product", "title variants name images")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
