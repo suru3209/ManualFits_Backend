@@ -63,8 +63,9 @@ const io = new SocketIOServer(server, {
 // Initialize socket handler
 const socketHandler = new SocketHandler(io);
 
-// Set socket instance for support controller
+// Set socket instance for support controller and make it globally available
 setSocketInstance(io);
+(global as any).io = io;
 // Middleware setup
 app.use(requestLogger);
 app.use(simpleCors); // Use simple CORS middleware
@@ -142,11 +143,12 @@ app.get("/products", async (req, res) => {
     if (admin !== "true") {
       query = {
         status: "active",
-        inStock: true,
+        isActive: true,
+        totalStock: { $gt: 0 },
       };
     }
 
-    const products = await Product.find(query).sort({ createdAt: -1 });
+    const products = await Product.find(query).sort({ createdAt: -1 }).lean();
 
     console.log(
       `✅ Found ${products.length} ${

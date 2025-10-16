@@ -25,6 +25,9 @@ import {
   updatePaymentSettings,
   adminImageUpload,
   getPublicPaymentSettings,
+  getAdminProfile,
+  updateAdminProfile,
+  getDashboardChartData,
 } from "../controllers/adminController";
 import { adminAuth } from "../middleware/adminAuthMiddleware";
 import HiddenProducts from "../models/HiddenProducts";
@@ -125,5 +128,12 @@ router.put("/payment-settings", updatePaymentSettings);
 
 // Admin Upload
 router.post("/upload", uploadSingleMiddleware, adminImageUpload);
+
+// Admin Profile
+router.get("/profile", adminAuth, getAdminProfile);
+router.put("/profile", adminAuth, updateAdminProfile);
+
+// Dashboard Chart Data
+router.get("/dashboard/chart-data", adminAuth, getDashboardChartData);
 
 export default router;

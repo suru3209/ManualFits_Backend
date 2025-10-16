@@ -181,6 +181,22 @@ export const createOrder = async (req: Request, res: Response) => {
 
     await newOrder.save();
 
+    // Emit notification to admin room for new order
+    const io = (global as any).io;
+    if (io) {
+      io.to("admin_room").emit("new_order_notification", {
+        orderId: newOrder._id,
+        userId: userId,
+        totalAmount: totalAmount,
+        itemsCount: items.length,
+        timestamp: new Date(),
+        status: "pending",
+      });
+      console.log(
+        `📦 New order notification sent to admin room for order ${newOrder._id}`
+      );
+    }
+
     res.json({
       message: "Order created successfully",
       order: newOrder,

@@ -68,6 +68,23 @@ export const createTicket = async (req: Request, res: Response) => {
     // Notify admins about new ticket
     await AutoReplyService.notifyAdminsNewTicket(ticket);
 
+    // Emit notification to admin room for new ticket
+    if (io) {
+      io.to("admin_room").emit("new_ticket_notification", {
+        ticketId: ticket._id,
+        userId: user._id,
+        userEmail: userEmail,
+        subject: subject,
+        category: category || "general",
+        priority: priority || "medium",
+        timestamp: new Date(),
+        status: "open",
+      });
+      console.log(
+        `🎫 New ticket notification sent to admin room for ticket ${ticket._id}`
+      );
+    }
+
     // Get the welcome message that was created
     const welcomeMessage = await Message.findOne({
       ticketId: ticket._id,

@@ -157,22 +157,188 @@ export const getAllUsers = async (req: Request, res: Response) => {
 
 export const getAllOrders = async (req: Request, res: Response) => {
   try {
-    const { page = 1, limit = 10, status = "" } = req.query;
+    const { page = 1, limit = 10, status = "", search = "" } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-    const query = status ? { status } : {};
 
-    const orders = await Order.find(query)
-      .populate("user", "username email")
-      .populate("items.product", "title variants")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
+    console.log("🔍 Admin Orders Search Debug:", {
+      search: search,
+      status: status,
+      page: page,
+      limit: limit,
+    });
 
-    const total = await Order.countDocuments(query);
+    // Build query object
+    const query: any = {};
+    if (status) query.status = status;
+
+    // Add search functionality
+    if (search) {
+      query.$or = [
+        { _id: { $regex: search, $options: "i" } }, // Search by order ID
+        { "user.username": { $regex: search, $options: "i" } }, // Search by username
+        { "user.email": { $regex: search, $options: "i" } }, // Search by email
+        { "shippingAddress.fullName": { $regex: search, $options: "i" } }, // Search by customer name
+        { "items.product": { $regex: search, $options: "i" } }, // Search by product ID
+      ];
+    }
+
+    console.log("🔍 MongoDB Query:", JSON.stringify(query, null, 2));
+
+    let orders;
+    if (search) {
+      // For search, get all orders first, then filter and paginate
+      const allOrders = await Order.find({})
+        .populate("user", "username email")
+        .populate("items.product", "title variants images")
+        .sort({ createdAt: -1 });
+
+      // Filter orders based on search criteria
+      const filteredOrders = allOrders.filter((order) => {
+        const searchLower = (search as string).toLowerCase();
+
+        // Check order ID
+        if (order._id.toString().toLowerCase().includes(searchLower))
+          return true;
+
+        // Check user info
+        if (order.user && typeof order.user === "object") {
+          if ((order.user as any).username?.toLowerCase().includes(searchLower))
+            return true;
+          if ((order.user as any).email?.toLowerCase().includes(searchLower))
+            return true;
+        }
+
+        // Check shipping address
+        if (
+          order.shippingAddress?.fullName?.toLowerCase().includes(searchLower)
+        )
+          return true;
+
+        // Check product titles
+        if (order.items && order.items.length > 0) {
+          for (const item of order.items) {
+            if (item.product && typeof item.product === "object") {
+              if (
+                (item.product as any).title?.toLowerCase().includes(searchLower)
+              )
+                return true;
+            }
+          }
+        }
+
+        return false;
+      });
+
+      // Apply pagination to filtered results
+      orders = filteredOrders.slice(skip, skip + Number(limit));
+    } else {
+      // For non-search queries, use direct MongoDB query
+      orders = await Order.find(query)
+        .populate("user", "username email")
+        .populate("items.product", "title variants images")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit));
+    }
+
+    // Process orders to extract correct variant data
+    const processedOrders = orders.map((order) => {
+      const processedItems = order.items.map((item) => {
+        if (item.product && item.product.variants) {
+          // Find the matching variant based on size and color
+          const matchingVariant = item.product.variants.find(
+            (variant) =>
+              variant.size === item.size && variant.color === item.color
+          );
+
+          if (matchingVariant) {
+            return {
+              ...item.toObject(),
+              product: {
+                name: item.product.title,
+                images: matchingVariant.images || item.product.images || [],
+                price: matchingVariant.price,
+              },
+            };
+          }
+        }
+
+        // Fallback if no matching variant found
+        return {
+          ...item.toObject(),
+          product: {
+            name: item.product?.title || "Product Name Not Available",
+            images: item.product?.images || [],
+            price: 0,
+          },
+        };
+      });
+
+      return {
+        ...order.toObject(),
+        items: processedItems,
+      };
+    });
+
+    let total;
+    if (search) {
+      // For search, count filtered results
+      const allOrders = await Order.find({})
+        .populate("user", "username email")
+        .populate("items.product", "title variants images");
+
+      const filteredOrders = allOrders.filter((order) => {
+        const searchLower = (search as string).toLowerCase();
+
+        // Check order ID
+        if (order._id.toString().toLowerCase().includes(searchLower))
+          return true;
+
+        // Check user info
+        if (order.user && typeof order.user === "object") {
+          if ((order.user as any).username?.toLowerCase().includes(searchLower))
+            return true;
+          if ((order.user as any).email?.toLowerCase().includes(searchLower))
+            return true;
+        }
+
+        // Check shipping address
+        if (
+          order.shippingAddress?.fullName?.toLowerCase().includes(searchLower)
+        )
+          return true;
+
+        // Check product titles
+        if (order.items && order.items.length > 0) {
+          for (const item of order.items) {
+            if (item.product && typeof item.product === "object") {
+              if (
+                (item.product as any).title?.toLowerCase().includes(searchLower)
+              )
+                return true;
+            }
+          }
+        }
+
+        return false;
+      });
+
+      total = filteredOrders.length;
+    } else {
+      // For non-search queries, use direct count
+      total = await Order.countDocuments(query);
+    }
+
+    console.log("🔍 Search Results:", {
+      searchQuery: search,
+      totalResults: total,
+      returnedOrders: processedOrders.length,
+      orderIds: processedOrders.map((o) => o._id),
+    });
 
     res.json({
       message: "Orders retrieved successfully",
-      orders,
+      orders: processedOrders,
       pagination: {
         current: Number(page),
         pages: Math.ceil(total / Number(limit)),
@@ -936,6 +1102,247 @@ export const getPublicPaymentSettings = async (req: Request, res: Response) => {
     res.status(500).json({
       message: "Error fetching payment settings",
       error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+// Get dashboard chart data
+export const getDashboardChartData = async (req: Request, res: Response) => {
+  try {
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+
+    // Get daily order and revenue data for the last 7 days
+    const dailyData = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: sevenDaysAgo },
+          status: "delivered",
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+            day: { $dayOfMonth: "$createdAt" },
+          },
+          orders: { $sum: 1 },
+          revenue: { $sum: "$totalAmount" },
+        },
+      },
+      {
+        $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 },
+      },
+    ]);
+
+    // Generate chart data for the last 7 days
+    const chartData = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+
+      // Find data for this date
+      const dayData = dailyData.find(
+        (d) =>
+          d._id.year === date.getFullYear() &&
+          d._id.month === date.getMonth() + 1 &&
+          d._id.day === date.getDate()
+      );
+
+      chartData.push({
+        date: date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
+        orders: dayData ? dayData.orders : 0,
+        revenue: dayData ? dayData.revenue : 0,
+      });
+    }
+
+    // Get monthly comparison data
+    const currentMonth = new Date();
+    const lastMonth = new Date(currentMonth);
+    lastMonth.setMonth(currentMonth.getMonth() - 1);
+
+    const [currentMonthData, lastMonthData] = await Promise.all([
+      Order.aggregate([
+        {
+          $match: {
+            createdAt: {
+              $gte: new Date(
+                currentMonth.getFullYear(),
+                currentMonth.getMonth(),
+                1
+              ),
+              $lt: new Date(
+                currentMonth.getFullYear(),
+                currentMonth.getMonth() + 1,
+                1
+              ),
+            },
+            status: "delivered",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            orders: { $sum: 1 },
+            revenue: { $sum: "$totalAmount" },
+          },
+        },
+      ]),
+      Order.aggregate([
+        {
+          $match: {
+            createdAt: {
+              $gte: new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1),
+              $lt: new Date(
+                lastMonth.getFullYear(),
+                lastMonth.getMonth() + 1,
+                1
+              ),
+            },
+            status: "delivered",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            orders: { $sum: 1 },
+            revenue: { $sum: "$totalAmount" },
+          },
+        },
+      ]),
+    ]);
+
+    const currentOrders =
+      currentMonthData.length > 0 ? currentMonthData[0].orders : 0;
+    const lastOrders = lastMonthData.length > 0 ? lastMonthData[0].orders : 0;
+    const currentRevenue =
+      currentMonthData.length > 0 ? currentMonthData[0].revenue : 0;
+    const lastRevenue = lastMonthData.length > 0 ? lastMonthData[0].revenue : 0;
+
+    // Calculate percentage changes
+    const orderGrowth =
+      lastOrders > 0 ? ((currentOrders - lastOrders) / lastOrders) * 100 : 0;
+    const revenueGrowth =
+      lastRevenue > 0
+        ? ((currentRevenue - lastRevenue) / lastRevenue) * 100
+        : 0;
+
+    res.json({
+      message: "Chart data retrieved successfully",
+      data: {
+        chartData,
+        comparison: {
+          orderGrowth: Math.round(orderGrowth),
+          revenueGrowth: Math.round(revenueGrowth),
+          currentOrders,
+          lastOrders,
+          currentRevenue,
+          lastRevenue,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching chart data:", error);
+    res.status(500).json({
+      message: "Error fetching chart data",
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+};
+
+// Get admin profile
+export const getAdminProfile = async (req: AdminRequest, res: Response) => {
+  try {
+    const adminId = req.admin?.id;
+
+    if (!adminId) {
+      return res.status(401).json({ message: "Admin not authenticated" });
+    }
+
+    const admin = await Admin.findById(adminId).select("-password");
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    res.json({
+      message: "Admin profile retrieved successfully",
+      admin,
+    });
+  } catch (error: any) {
+    console.error("Get admin profile error:", error);
+    res.status(500).json({
+      message: "Error retrieving profile",
+      error: error.message,
+    });
+  }
+};
+
+// Update admin profile
+export const updateAdminProfile = async (req: AdminRequest, res: Response) => {
+  try {
+    const adminId = req.admin?.id;
+    const { username, email } = req.body;
+
+    if (!adminId) {
+      return res.status(401).json({ message: "Admin not authenticated" });
+    }
+
+    // Find the admin
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    // Check if username is already taken by another admin
+    if (username && username !== admin.username) {
+      const existingAdmin = await Admin.findOne({
+        username,
+        _id: { $ne: adminId },
+      });
+      if (existingAdmin) {
+        return res.status(400).json({
+          message: "Username already taken",
+        });
+      }
+    }
+
+    // Check if email is already taken by another admin
+    if (email && email !== admin.email) {
+      const existingAdmin = await Admin.findOne({
+        email,
+        _id: { $ne: adminId },
+      });
+      if (existingAdmin) {
+        return res.status(400).json({
+          message: "Email already taken",
+        });
+      }
+    }
+
+    // Update admin fields
+    if (username) admin.username = username;
+    if (email) admin.email = email;
+
+    admin.updatedAt = new Date();
+    await admin.save();
+
+    // Return updated admin (without password)
+    const updatedAdmin = await Admin.findById(adminId).select("-password");
+
+    res.json({
+      message: "Profile updated successfully",
+      admin: updatedAdmin,
+    });
+  } catch (error: any) {
+    console.error("Update admin profile error:", error);
+    res.status(500).json({
+      message: "Error updating profile",
+      error: error.message,
     });
   }
 };
