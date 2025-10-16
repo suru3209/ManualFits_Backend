@@ -67,4 +67,7 @@ router.put("/admins/:adminId/permissions", adminController_1.updateAdminPermissi
 router.get("/payment-settings", adminController_1.getPaymentSettings);
 router.put("/payment-settings", adminController_1.updatePaymentSettings);
 router.post("/upload", uploadController_1.uploadSingleMiddleware, adminController_1.adminImageUpload);
+router.get("/profile", adminAuthMiddleware_1.adminAuth, adminController_1.getAdminProfile);
+router.put("/profile", adminAuthMiddleware_1.adminAuth, adminController_1.updateAdminProfile);
+router.get("/dashboard/chart-data", adminAuthMiddleware_1.adminAuth, adminController_1.getDashboardChartData);
 exports.default = router;

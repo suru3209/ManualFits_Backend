@@ -141,14 +141,47 @@ app.get("/products", async (req, res) => {
     // If admin=true query parameter is provided, return all products
     // Otherwise, return only active and in-stock products for customers
     if (admin !== "true") {
+      // Temporarily relaxed filters for production debugging
       query = {
-        status: "active",
-        isActive: true,
-        totalStock: { $gt: 0 },
+        $or: [
+          { status: "active" },
+          { status: { $exists: false } }, // Include products without status field
+        ],
+        $and: [
+          { isActive: { $ne: false } }, // Include products where isActive is not explicitly false
+        ],
       };
+
+      // Only apply stock filter if totalStock field exists
+      const productsWithStock = await Product.find({
+        totalStock: { $exists: true },
+      })
+        .limit(1)
+        .lean();
+      if (productsWithStock.length > 0) {
+        query.totalStock = { $gt: 0 };
+      }
     }
 
     const products = await Product.find(query).sort({ createdAt: -1 }).lean();
+
+    // Debug logging for production
+    if (admin !== "true") {
+      console.log("🔍 Customer API Query:", JSON.stringify(query, null, 2));
+
+      // Check a few sample products to see their status
+      const sampleProducts = await Product.find({}).limit(3).lean();
+      console.log(
+        "🔍 Sample products status:",
+        sampleProducts.map((p) => ({
+          id: p._id,
+          title: p.title,
+          status: p.status,
+          isActive: p.isActive,
+          totalStock: p.totalStock,
+        }))
+      );
+    }
 
     console.log(
       `✅ Found ${products.length} ${

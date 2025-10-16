@@ -51,6 +51,19 @@ const createTicket = async (req, res) => {
         await initialMessage.save();
         await autoReplyService_1.AutoReplyService.sendWelcomeMessage(ticket._id.toString());
         await autoReplyService_1.AutoReplyService.notifyAdminsNewTicket(ticket);
+        if (io) {
+            io.to("admin_room").emit("new_ticket_notification", {
+                ticketId: ticket._id,
+                userId: user._id,
+                userEmail: userEmail,
+                subject: subject,
+                category: category || "general",
+                priority: priority || "medium",
+                timestamp: new Date(),
+                status: "open",
+            });
+            console.log(`🎫 New ticket notification sent to admin room for ticket ${ticket._id}`);
+        }
         const welcomeMessage = await Message_1.default.findOne({
             ticketId: ticket._id,
             messageType: "auto-reply",

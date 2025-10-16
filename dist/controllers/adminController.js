@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPublicPaymentSettings = exports.adminImageUpload = exports.updatePaymentSettings = exports.getPaymentSettings = exports.updateAdminPermissions = exports.getPermissions = exports.deleteAdmin = exports.updateAdmin = exports.createAdmin = exports.getAllAdmins = exports.deleteProduct = exports.getProduct = exports.updateProduct = exports.createProduct = exports.updateReturnReplaceStatus = exports.getReturnReplaceRequests = exports.deleteReview = exports.getAllReviews = exports.updateProductStatus = exports.getAllProducts = exports.updateOrderStatus = exports.getAllOrders = exports.getAllUsers = exports.getDashboardStats = exports.adminLogin = void 0;
+exports.updateAdminProfile = exports.getAdminProfile = exports.getDashboardChartData = exports.getPublicPaymentSettings = exports.adminImageUpload = exports.updatePaymentSettings = exports.getPaymentSettings = exports.updateAdminPermissions = exports.getPermissions = exports.deleteAdmin = exports.updateAdmin = exports.createAdmin = exports.getAllAdmins = exports.deleteProduct = exports.getProduct = exports.updateProduct = exports.createProduct = exports.updateReturnReplaceStatus = exports.getReturnReplaceRequests = exports.deleteReview = exports.getAllReviews = exports.updateProductStatus = exports.getAllProducts = exports.updateOrderStatus = exports.getAllOrders = exports.getAllUsers = exports.getDashboardStats = exports.adminLogin = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const Admin_1 = __importDefault(require("../models/Admin"));
@@ -164,19 +164,135 @@ const getAllUsers = async (req, res) => {
 exports.getAllUsers = getAllUsers;
 const getAllOrders = async (req, res) => {
     try {
-        const { page = 1, limit = 10, status = "" } = req.query;
+        const { page = 1, limit = 10, status = "", search = "" } = req.query;
         const skip = (Number(page) - 1) * Number(limit);
-        const query = status ? { status } : {};
-        const orders = await Order_1.Order.find(query)
-            .populate("user", "username email")
-            .populate("items.product", "title variants")
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(Number(limit));
-        const total = await Order_1.Order.countDocuments(query);
+        console.log("🔍 Admin Orders Search Debug:", {
+            search: search,
+            status: status,
+            page: page,
+            limit: limit,
+        });
+        const query = {};
+        if (status)
+            query.status = status;
+        if (search) {
+            query.$or = [
+                { _id: { $regex: search, $options: "i" } },
+                { "user.username": { $regex: search, $options: "i" } },
+                { "user.email": { $regex: search, $options: "i" } },
+                { "shippingAddress.fullName": { $regex: search, $options: "i" } },
+                { "items.product": { $regex: search, $options: "i" } },
+            ];
+        }
+        console.log("🔍 MongoDB Query:", JSON.stringify(query, null, 2));
+        let orders;
+        if (search) {
+            const allOrders = await Order_1.Order.find({})
+                .populate("user", "username email")
+                .populate("items.product", "title variants images")
+                .sort({ createdAt: -1 });
+            const filteredOrders = allOrders.filter((order) => {
+                const searchLower = search.toLowerCase();
+                if (order._id.toString().toLowerCase().includes(searchLower))
+                    return true;
+                if (order.user && typeof order.user === "object") {
+                    if (order.user.username?.toLowerCase().includes(searchLower))
+                        return true;
+                    if (order.user.email?.toLowerCase().includes(searchLower))
+                        return true;
+                }
+                if (order.shippingAddress?.fullName?.toLowerCase().includes(searchLower))
+                    return true;
+                if (order.items && order.items.length > 0) {
+                    for (const item of order.items) {
+                        if (item.product && typeof item.product === "object") {
+                            if (item.product.title?.toLowerCase().includes(searchLower))
+                                return true;
+                        }
+                    }
+                }
+                return false;
+            });
+            orders = filteredOrders.slice(skip, skip + Number(limit));
+        }
+        else {
+            orders = await Order_1.Order.find(query)
+                .populate("user", "username email")
+                .populate("items.product", "title variants images")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(Number(limit));
+        }
+        const processedOrders = orders.map((order) => {
+            const processedItems = order.items.map((item) => {
+                if (item.product && item.product.variants) {
+                    const matchingVariant = item.product.variants.find((variant) => variant.size === item.size && variant.color === item.color);
+                    if (matchingVariant) {
+                        return {
+                            ...item.toObject(),
+                            product: {
+                                name: item.product.title,
+                                images: matchingVariant.images || item.product.images || [],
+                                price: matchingVariant.price,
+                            },
+                        };
+                    }
+                }
+                return {
+                    ...item.toObject(),
+                    product: {
+                        name: item.product?.title || "Product Name Not Available",
+                        images: item.product?.images || [],
+                        price: 0,
+                    },
+                };
+            });
+            return {
+                ...order.toObject(),
+                items: processedItems,
+            };
+        });
+        let total;
+        if (search) {
+            const allOrders = await Order_1.Order.find({})
+                .populate("user", "username email")
+                .populate("items.product", "title variants images");
+            const filteredOrders = allOrders.filter((order) => {
+                const searchLower = search.toLowerCase();
+                if (order._id.toString().toLowerCase().includes(searchLower))
+                    return true;
+                if (order.user && typeof order.user === "object") {
+                    if (order.user.username?.toLowerCase().includes(searchLower))
+                        return true;
+                    if (order.user.email?.toLowerCase().includes(searchLower))
+                        return true;
+                }
+                if (order.shippingAddress?.fullName?.toLowerCase().includes(searchLower))
+                    return true;
+                if (order.items && order.items.length > 0) {
+                    for (const item of order.items) {
+                        if (item.product && typeof item.product === "object") {
+                            if (item.product.title?.toLowerCase().includes(searchLower))
+                                return true;
+                        }
+                    }
+                }
+                return false;
+            });
+            total = filteredOrders.length;
+        }
+        else {
+            total = await Order_1.Order.countDocuments(query);
+        }
+        console.log("🔍 Search Results:", {
+            searchQuery: search,
+            totalResults: total,
+            returnedOrders: processedOrders.length,
+            orderIds: processedOrders.map((o) => o._id),
+        });
         res.json({
             message: "Orders retrieved successfully",
-            orders,
+            orders: processedOrders,
             pagination: {
                 current: Number(page),
                 pages: Math.ceil(total / Number(limit)),
@@ -869,3 +985,197 @@ const getPublicPaymentSettings = async (req, res) => {
     }
 };
 exports.getPublicPaymentSettings = getPublicPaymentSettings;
+const getDashboardChartData = async (req, res) => {
+    try {
+        const today = new Date();
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
+        const dailyData = await Order_1.Order.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: sevenDaysAgo },
+                    status: "delivered",
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: "$createdAt" },
+                        month: { $month: "$createdAt" },
+                        day: { $dayOfMonth: "$createdAt" },
+                    },
+                    orders: { $sum: 1 },
+                    revenue: { $sum: "$totalAmount" },
+                },
+            },
+            {
+                $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 },
+            },
+        ]);
+        const chartData = [];
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            const dayData = dailyData.find((d) => d._id.year === date.getFullYear() &&
+                d._id.month === date.getMonth() + 1 &&
+                d._id.day === date.getDate());
+            chartData.push({
+                date: date.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                }),
+                orders: dayData ? dayData.orders : 0,
+                revenue: dayData ? dayData.revenue : 0,
+            });
+        }
+        const currentMonth = new Date();
+        const lastMonth = new Date(currentMonth);
+        lastMonth.setMonth(currentMonth.getMonth() - 1);
+        const [currentMonthData, lastMonthData] = await Promise.all([
+            Order_1.Order.aggregate([
+                {
+                    $match: {
+                        createdAt: {
+                            $gte: new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1),
+                            $lt: new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1),
+                        },
+                        status: "delivered",
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        orders: { $sum: 1 },
+                        revenue: { $sum: "$totalAmount" },
+                    },
+                },
+            ]),
+            Order_1.Order.aggregate([
+                {
+                    $match: {
+                        createdAt: {
+                            $gte: new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1),
+                            $lt: new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 1),
+                        },
+                        status: "delivered",
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        orders: { $sum: 1 },
+                        revenue: { $sum: "$totalAmount" },
+                    },
+                },
+            ]),
+        ]);
+        const currentOrders = currentMonthData.length > 0 ? currentMonthData[0].orders : 0;
+        const lastOrders = lastMonthData.length > 0 ? lastMonthData[0].orders : 0;
+        const currentRevenue = currentMonthData.length > 0 ? currentMonthData[0].revenue : 0;
+        const lastRevenue = lastMonthData.length > 0 ? lastMonthData[0].revenue : 0;
+        const orderGrowth = lastOrders > 0 ? ((currentOrders - lastOrders) / lastOrders) * 100 : 0;
+        const revenueGrowth = lastRevenue > 0
+            ? ((currentRevenue - lastRevenue) / lastRevenue) * 100
+            : 0;
+        res.json({
+            message: "Chart data retrieved successfully",
+            data: {
+                chartData,
+                comparison: {
+                    orderGrowth: Math.round(orderGrowth),
+                    revenueGrowth: Math.round(revenueGrowth),
+                    currentOrders,
+                    lastOrders,
+                    currentRevenue,
+                    lastRevenue,
+                },
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error fetching chart data:", error);
+        res.status(500).json({
+            message: "Error fetching chart data",
+            error: error instanceof Error ? error.message : error,
+        });
+    }
+};
+exports.getDashboardChartData = getDashboardChartData;
+const getAdminProfile = async (req, res) => {
+    try {
+        const adminId = req.admin?.id;
+        if (!adminId) {
+            return res.status(401).json({ message: "Admin not authenticated" });
+        }
+        const admin = await Admin_1.default.findById(adminId).select("-password");
+        if (!admin) {
+            return res.status(404).json({ message: "Admin not found" });
+        }
+        res.json({
+            message: "Admin profile retrieved successfully",
+            admin,
+        });
+    }
+    catch (error) {
+        console.error("Get admin profile error:", error);
+        res.status(500).json({
+            message: "Error retrieving profile",
+            error: error.message,
+        });
+    }
+};
+exports.getAdminProfile = getAdminProfile;
+const updateAdminProfile = async (req, res) => {
+    try {
+        const adminId = req.admin?.id;
+        const { username, email } = req.body;
+        if (!adminId) {
+            return res.status(401).json({ message: "Admin not authenticated" });
+        }
+        const admin = await Admin_1.default.findById(adminId);
+        if (!admin) {
+            return res.status(404).json({ message: "Admin not found" });
+        }
+        if (username && username !== admin.username) {
+            const existingAdmin = await Admin_1.default.findOne({
+                username,
+                _id: { $ne: adminId },
+            });
+            if (existingAdmin) {
+                return res.status(400).json({
+                    message: "Username already taken",
+                });
+            }
+        }
+        if (email && email !== admin.email) {
+            const existingAdmin = await Admin_1.default.findOne({
+                email,
+                _id: { $ne: adminId },
+            });
+            if (existingAdmin) {
+                return res.status(400).json({
+                    message: "Email already taken",
+                });
+            }
+        }
+        if (username)
+            admin.username = username;
+        if (email)
+            admin.email = email;
+        admin.updatedAt = new Date();
+        await admin.save();
+        const updatedAdmin = await Admin_1.default.findById(adminId).select("-password");
+        res.json({
+            message: "Profile updated successfully",
+            admin: updatedAdmin,
+        });
+    }
+    catch (error) {
+        console.error("Update admin profile error:", error);
+        res.status(500).json({
+            message: "Error updating profile",
+            error: error.message,
+        });
+    }
+};
+exports.updateAdminProfile = updateAdminProfile;

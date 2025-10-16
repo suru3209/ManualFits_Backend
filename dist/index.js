@@ -53,6 +53,7 @@ const io = new socket_io_1.Server(server, {
 });
 const socketHandler = new socketHandler_1.SocketHandler(io);
 (0, supportController_1.setSocketInstance)(io);
+global.io = io;
 app.use(corsMiddleware_1.requestLogger);
 app.use(corsMiddleware_1.simpleCors);
 app.use(corsMiddleware_1.securityHeaders);
@@ -108,11 +109,31 @@ app.get("/products", async (req, res) => {
         let query = {};
         if (admin !== "true") {
             query = {
-                status: "active",
-                inStock: true,
+                $or: [
+                    { status: "active" },
+                    { status: { $exists: false } },
+                ],
+                $and: [
+                    { isActive: { $ne: false } },
+                ]
             };
+            const productsWithStock = await ProductModal_1.default.find({ totalStock: { $exists: true } }).limit(1).lean();
+            if (productsWithStock.length > 0) {
+                query.totalStock = { $gt: 0 };
+            }
         }
-        const products = await ProductModal_1.default.find(query).sort({ createdAt: -1 });
+        const products = await ProductModal_1.default.find(query).sort({ createdAt: -1 }).lean();
+        if (admin !== "true") {
+            console.log("🔍 Customer API Query:", JSON.stringify(query, null, 2));
+            const sampleProducts = await ProductModal_1.default.find({}).limit(3).lean();
+            console.log("🔍 Sample products status:", sampleProducts.map(p => ({
+                id: p._id,
+                title: p.title,
+                status: p.status,
+                isActive: p.isActive,
+                totalStock: p.totalStock
+            })));
+        }
         console.log(`✅ Found ${products.length} ${admin === "true" ? "total" : "active"} products`);
         res.status(200).json({
             message: "Products fetched successfully",
